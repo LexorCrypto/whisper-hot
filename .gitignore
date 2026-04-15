@@ -1,0 +1,44 @@
+# SwiftPM / Xcode build artifacts
+.build/
+.swiftpm/
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+
+# App bundles and installer artifacts
+*.app
+*.dmg
+*.pkg
+*.zip
+
+# macOS cruft
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Editor state
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local Claude Code config (permission rules, local overrides)
+.claude/
+.cursor/
+
+# Secrets — API keys should live in the macOS Keychain. If any of these
+# files ever show up in the tree, block them before they can be committed.
+.env
+.env.*
+secrets.json
+*.pem
+*.key
+*.p12
+*.mobileprovision
+apikeys.txt
+api-keys.txt
+credentials.json
