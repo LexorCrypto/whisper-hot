@@ -30,6 +30,9 @@ Icon?
 .claude/
 .cursor/
 
+# Codex session id (machine-local, not shareable)
+.context/
+
 # Secrets — API keys should live in the macOS Keychain. If any of these
 # files ever show up in the tree, block them before they can be committed.
 .env

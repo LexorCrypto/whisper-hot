@@ -30,13 +30,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private func buildWindow() {
         let hostingView = NSHostingView(rootView: SettingsView())
-        // Let SwiftUI drive its own intrinsic size via the .frame modifier
-        // inside SettingsView; we mirror the same size on the window chrome.
-        hostingView.frame = NSRect(x: 0, y: 0, width: 560, height: 620)
+        // Initial content size matches SettingsView's idealWidth/idealHeight
+        // so the window boots at a sensible size. The window is resizable,
+        // so the user can grow or shrink it; SwiftUI enforces min/max on
+        // the content.
+        hostingView.frame = NSRect(x: 0, y: 0, width: 640, height: 560)
 
         let newWindow = NSWindow(
             contentRect: hostingView.frame,
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )

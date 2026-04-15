@@ -2,6 +2,97 @@
 
 Все значимые изменения в WhisperLocal.
 
+## [0.2.2] — 2026-04-16
+
+Юзабилити-переделка Settings и исправление regression'ов из 0.2.0.
+
+### Для пользователей
+
+- **Settings теперь в 5 вкладках.** Recording, Providers,
+  Post-processing, Hotkey, History & Privacy. Всё, что раньше
+  было единой простынёй на 14 секций и не пролистывалось до конца
+  (прибитая высота клипала нижние ~600px), теперь разложено по темам.
+  Окно настроек стало resizable — можно растянуть или сжать.
+- **Хоткей-рекордер наконец-то реально доступен.** Живёт на своей
+  вкладке **Hotkey** рядом с кнопкой Reset и экспериментальным
+  Fn (🌐) тумблером. Клик в поле → нажимаешь новую комбинацию →
+  всё.
+- **В Providers видно только выбранный сервис.** Переключаешь
+  провайдера — поля чужих API-ключей прячутся. Больше никаких
+  трёх параллельных секций OpenAI/OpenRouter/Groq, даже если ты
+  используешь только один.
+- **Recording → After transcription** явно напоминает про
+  Accessibility. Если auto-paste перестал работать (чаще всего
+  после апгрейда версии, когда TCC сбрасывает grant'ы), там есть
+  подсказка, куда идти в System Settings.
+
+### Для контрибуторов
+
+- `Sources/WhisperLocal/Settings/SettingsView.swift` разобран из
+  одного 550-строчного `Form` в 5 отдельных `Form` внутри `TabView`.
+  Каждая вкладка — своя `@ViewBuilder` computed property. Прибитый
+  `.frame(width: 620, height: 1220)` заменён на
+  `minWidth`/`idealWidth`/`maxWidth` + `minHeight`/`idealHeight`/
+  `maxHeight`, так что Form с `.formStyle(.grouped)` сам решает, что
+  скроллить.
+- `SettingsWindowController` теперь создаёт окно с
+  `[.titled, .closable, .resizable]`. Initial content size 640×560.
+- Поведенческая совместимость сохранена: те же `@AppStorage` ключи,
+  тот же `whisperLocalSettingsWillShow` NotificationCenter hook для
+  реинициализации Keychain state при повторном открытии, та же
+  suppression-flag логика для Launch at login observer.
+
+## [0.2.1] — 2026-04-16
+
+Фикс "Keychain спрашивает пароль на каждую запись после пересборки".
+Единственное функциональное изменение — подпись стала стабильной.
+
+### Для пользователей
+
+- **Больше никаких запросов login-пароля на Keychain после первого
+  запуска новой версии.** До 0.2.1 каждая пересборка приложения
+  меняла designated requirement в code signature, и macOS просил
+  разрешения на доступ к API-ключам и ключу шифрования истории на
+  каждый rebuild, потому что Keychain ACL был привязан к идентичности
+  предыдущего бинаря. 0.2.1 использует стабильный self-signed
+  сертификат, так что "Разрешить всегда" прилипает к будущим
+  сборкам.
+- **Один раз при апгрейде с 0.1.0 / 0.2.0 macOS всё равно спросит
+  пароль на каждый уже сохранённый Keychain-item.** Это ожидаемо:
+  старый ACL не знает новую identity. Жми **«Разрешить всегда»**
+  на каждом диалоге, дальше тихо — и на этой сборке, и на всех
+  будущих.
+- **Миграция permissions.** Новая identity заново попросит
+  Accessibility в System Settings → Privacy & Security → Accessibility.
+  TCC не переносит grants с одной подписи на другую, так что
+  удалить старый entry и добавить заново — нормальный шаг при
+  апгрейде.
+
+### Для контрибуторов
+
+- Новый `scripts/create-signing-identity.sh` генерит self-signed
+  RSA 2048 сертификат `whisper-hot-local` с `codeSigning` EKU,
+  импортирует его в login keychain через `security import` +
+  `set-key-partition-list`, пишет user-domain trust через
+  `add-trusted-cert`, и прогоняет end-to-end signing probe
+  (компилит stub Mach-O, подписывает новой идентичностью,
+  верифицирует через `codesign --verify`). Идемпотентный: если
+  идентичность уже существует, запускает только probe. Один раз
+  на машине, run-once interactive.
+- `build.sh` теперь резолвит identity по CN через
+  `security find-identity -p codesigning` и подписывает по SHA-1,
+  а не по ad-hoc `--sign -`. Три exit-кода: found / missing /
+  duplicates. Отсутствующая identity = hard fail с pointer'ом на
+  setup-скрипт. Ad-hoc fallback не предусмотрен специально.
+- **Два Apple-specific gotchas**, заархивированные в комментариях
+  `scripts/create-signing-identity.sh` шаг [2/7]: OpenSSL 3.x
+  требует флага `-legacy` для PBE-SHA1-3DES (иначе `-keypbe`
+  тихо игнорируется и файл выходит AES-256), и Apple `security`
+  на macOS 13+ отказывается импортировать PKCS#12 с пустым
+  passphrase — надо всегда передавать random transport passphrase.
+- Новая секция в ARCHITECTURE.md → "Стабильная подпись вместо
+  ad-hoc" описывает design-rationale.
+
 ## [0.1.0] — 2026-04-15
 
 Первый MVP. 18 запланированных блоков выпущены, каждый проходил

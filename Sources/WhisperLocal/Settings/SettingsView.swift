@@ -62,113 +62,41 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Body
+
     var body: some View {
+        TabView {
+            recordingTab
+                .tabItem { Label("Recording", systemImage: "mic.fill") }
+            providersTab
+                .tabItem { Label("Providers", systemImage: "key.fill") }
+            postProcessingTab
+                .tabItem { Label("Post-processing", systemImage: "wand.and.stars") }
+            hotkeyTab
+                .tabItem { Label("Hotkey", systemImage: "keyboard") }
+            historyPrivacyTab
+                .tabItem { Label("History & Privacy", systemImage: "clock") }
+        }
+        .frame(minWidth: 620, idealWidth: 640, maxWidth: 760,
+               minHeight: 440, idealHeight: 560, maxHeight: 900)
+        .padding(.top, 8)
+        .onAppear {
+            normalizeStorageValues()
+            reloadKeys()
+            refreshLaunchAtLoginState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .whisperLocalSettingsWillShow)) { _ in
+            normalizeStorageValues()
+            reloadKeys()
+            refreshLaunchAtLoginState()
+        }
+    }
+
+    // MARK: - Tab: Recording
+
+    private var recordingTab: some View {
         Form {
-            Section("General") {
-                Toggle("Launch at login", isOn: $launchAtLoginEnabled)
-                    .onChange(of: launchAtLoginEnabled) { newValue in
-                        // Skip re-entry from our own programmatic revert.
-                        if suppressLaunchAtLoginChange {
-                            suppressLaunchAtLoginChange = false
-                            return
-                        }
-
-                        var failureMessage: String?
-                        do {
-                            try LaunchAtLoginController.setEnabled(newValue)
-                        } catch {
-                            failureMessage = LaunchAtLoginController.describe(error: error)
-                        }
-
-                        // SMAppService is the source of truth. After any
-                        // attempted change (success OR failure) re-read
-                        // isEnabled: on success, a `.requiresApproval`
-                        // outcome still means isEnabled == false and the
-                        // toggle should reflect that, not the user's click.
-                        let actual = LaunchAtLoginController.isEnabled
-                        if actual != launchAtLoginEnabled {
-                            suppressLaunchAtLoginChange = true
-                            launchAtLoginEnabled = actual
-                        }
-                        launchAtLoginStatus = failureMessage ?? LaunchAtLoginController.statusDescription
-                    }
-                Text(launchAtLoginStatus)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section("Provider") {
-                Picker("Service", selection: $provider) {
-                    ForEach(TranscriptionProvider.allCases) { p in
-                        Text(p.displayName).tag(p)
-                    }
-                }
-                Text(providerDescription)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section("OpenAI API Key") {
-                apiKeyControls(
-                    account: .openAI,
-                    binding: $openAIKey,
-                    status: $openAIStatus,
-                    placeholder: "sk-..."
-                )
-            }
-
-            Section("OpenRouter API Key") {
-                apiKeyControls(
-                    account: .openRouter,
-                    binding: $openRouterKey,
-                    status: $openRouterStatus,
-                    placeholder: "sk-or-..."
-                )
-            }
-
-            Section("Groq API Key") {
-                apiKeyControls(
-                    account: .groq,
-                    binding: $groqKey,
-                    status: $groqStatus,
-                    placeholder: "gsk_..."
-                )
-            }
-
-            Section("Local Whisper (offline)") {
-                LabeledContent("whisper.cpp binary") {
-                    HStack(spacing: 8) {
-                        Text(pathDisplay(localBinaryPath))
-                            .font(.caption)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("Choose…") { pickBinary() }
-                        if !localBinaryPath.isEmpty {
-                            Button("Clear") { localBinaryPath = "" }
-                        }
-                    }
-                }
-                LabeledContent("GGML model file") {
-                    HStack(spacing: 8) {
-                        Text(pathDisplay(localModelPath))
-                            .font(.caption)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("Choose…") { pickModel() }
-                        if !localModelPath.isEmpty {
-                            Button("Clear") { localModelPath = "" }
-                        }
-                    }
-                }
-                Text("Runs whisper.cpp as a subprocess. Install via Homebrew (`brew install whisper-cpp`) or build from source, then download a GGML model from huggingface.co/ggerganov/whisper.cpp.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section("Transcription") {
-                modelPicker
+            Section("Language") {
                 Picker("Language", selection: $language) {
                     Text("Auto detect").tag(TranscriptionLanguage.auto)
                     Text("English").tag(TranscriptionLanguage.en)
@@ -186,16 +114,176 @@ struct SettingsView: View {
                     Text("한국어").tag(TranscriptionLanguage.ko)
                     Text("中文").tag(TranscriptionLanguage.zh)
                 }
+                Text("Passed to every provider as a language hint. Auto-detect uses the provider's own detection.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section("After transcription") {
                 Toggle("Auto-paste into the active app", isOn: $autoPaste)
                 Toggle("Play sound chimes", isOn: $sounds)
+                Text("Auto-paste requires Accessibility permission. If nothing pastes, open System Settings → Privacy & Security → Accessibility and re-enable WhisperLocal.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
-            Section("Post-processing (optional)") {
-                Toggle("Run LLM cleanup after transcription", isOn: $postProcessingEnabled)
+            Section("Indicator") {
+                Picker("Style", selection: $indicatorStyle) {
+                    ForEach(IndicatorStyle.allCases) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+            }
 
+            Section("Startup") {
+                Toggle("Launch at login", isOn: $launchAtLoginEnabled)
+                    .onChange(of: launchAtLoginEnabled) { newValue in
+                        if suppressLaunchAtLoginChange {
+                            suppressLaunchAtLoginChange = false
+                            return
+                        }
+
+                        var failureMessage: String?
+                        do {
+                            try LaunchAtLoginController.setEnabled(newValue)
+                        } catch {
+                            failureMessage = LaunchAtLoginController.describe(error: error)
+                        }
+
+                        let actual = LaunchAtLoginController.isEnabled
+                        if actual != launchAtLoginEnabled {
+                            suppressLaunchAtLoginChange = true
+                            launchAtLoginEnabled = actual
+                        }
+                        launchAtLoginStatus = failureMessage ?? LaunchAtLoginController.statusDescription
+                    }
+                Text(launchAtLoginStatus)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Tab: Providers
+
+    private var providersTab: some View {
+        Form {
+            Section("Service") {
+                Picker("Provider", selection: $provider) {
+                    ForEach(TranscriptionProvider.allCases) { p in
+                        Text(p.displayName).tag(p)
+                    }
+                }
+                Text(providerDescription)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // Only render the config block for the currently-selected
+            // provider. Users of Groq never see an OpenAI key field and
+            // vice versa — that was the biggest source of "where is what"
+            // confusion in the old flat layout.
+            switch provider {
+            case .openai:
+                apiKeyAndModelSection(
+                    title: "OpenAI",
+                    account: .openAI,
+                    binding: $openAIKey,
+                    status: $openAIStatus,
+                    placeholder: "sk-..."
+                )
+            case .openRouter:
+                apiKeyAndModelSection(
+                    title: "OpenRouter",
+                    account: .openRouter,
+                    binding: $openRouterKey,
+                    status: $openRouterStatus,
+                    placeholder: "sk-or-..."
+                )
+            case .groq:
+                apiKeyAndModelSection(
+                    title: "Groq",
+                    account: .groq,
+                    binding: $groqKey,
+                    status: $groqStatus,
+                    placeholder: "gsk_..."
+                )
+            case .localWhisper:
+                localWhisperSection
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private func apiKeyAndModelSection(
+        title: String,
+        account: Keychain.Account,
+        binding: Binding<String>,
+        status: Binding<StatusMessage>,
+        placeholder: String
+    ) -> some View {
+        Section("\(title) API Key") {
+            apiKeyControls(
+                account: account,
+                binding: binding,
+                status: status,
+                placeholder: placeholder
+            )
+        }
+        Section("\(title) Model") {
+            modelPicker
+        }
+    }
+
+    private var localWhisperSection: some View {
+        Section("Local whisper.cpp") {
+            LabeledContent("Binary") {
+                HStack(spacing: 8) {
+                    Text(pathDisplay(localBinaryPath))
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Choose…") { pickBinary() }
+                    if !localBinaryPath.isEmpty {
+                        Button("Clear") { localBinaryPath = "" }
+                    }
+                }
+            }
+            LabeledContent("GGML model") {
+                HStack(spacing: 8) {
+                    Text(pathDisplay(localModelPath))
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Choose…") { pickModel() }
+                    if !localModelPath.isEmpty {
+                        Button("Clear") { localModelPath = "" }
+                    }
+                }
+            }
+            Text("Install via Homebrew (`brew install whisper-cpp`) or build from source, then download a GGML model from huggingface.co/ggerganov/whisper.cpp.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    // MARK: - Tab: Post-processing
+
+    private var postProcessingTab: some View {
+        Form {
+            Section("LLM cleanup") {
+                Toggle("Run LLM cleanup after transcription", isOn: $postProcessingEnabled)
+                Text("Sends the raw transcript through an OpenRouter chat model to clean fillers, rewrite for tone, translate, or whatever the preset defines. Costs one extra API call per recording. Uses the OpenRouter key from the Providers tab.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section("Preset") {
                 Picker("Preset", selection: $postProcessingPreset) {
                     ForEach(PostProcessingPreset.allCases) { preset in
                         Text(preset.displayName).tag(preset)
@@ -218,87 +306,26 @@ struct SettingsView: View {
                             .disabled(!postProcessingEnabled)
                     }
                 }
+            }
 
-                TextField("Model (OpenRouter slug)", text: $postProcessingModel, prompt: Text("openai/gpt-4o-mini"))
+            Section("Model") {
+                TextField("OpenRouter slug", text: $postProcessingModel, prompt: Text("openai/gpt-4o-mini"))
                     .textFieldStyle(.roundedBorder)
                     .disabled(!postProcessingEnabled)
-
-                Text("Uses the OpenRouter API key above. Accepts any chat-capable model slug from the OpenRouter catalog. Adds one extra API call per transcription — turn it off if latency matters.")
+                Text("Any chat-capable model from the OpenRouter catalog.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+        }
+        .formStyle(.grouped)
+    }
 
-            Section("Indicator") {
-                Picker("Style", selection: $indicatorStyle) {
-                    ForEach(IndicatorStyle.allCases) { style in
-                        Text(style.displayName).tag(style)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-            }
+    // MARK: - Tab: Hotkey
 
-            Section("Privacy & data") {
-                Picker("Audio retention", selection: $audioRetention) {
-                    ForEach(AudioRetention.allCases) { r in
-                        Text(r.displayName).tag(r)
-                    }
-                }
-
-                Button("Wipe all recorded audio now") {
-                    AudioRetentionSweeper.wipeAll()
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Label {
-                        Text("Cloud providers (OpenAI, OpenRouter, Groq) receive your audio. Pick \"Local whisper.cpp\" in the Provider section for fully offline transcription.")
-                    } icon: {
-                        Image(systemName: "cloud.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    Label {
-                        Text("Clipboard managers (Paste, Raycast, Alfred) will capture the transcript when it reaches the pasteboard. Disable auto-paste if that concerns you.")
-                    } icon: {
-                        Image(systemName: "doc.on.clipboard")
-                            .foregroundColor(.secondary)
-                    }
-                    Label {
-                        Text("Raw WAVs live in ~/Library/Caches/WhisperLocal/recordings/. API keys and the history encryption key live in the macOS Keychain, written with iCloud sync disabled.")
-                    } icon: {
-                        Image(systemName: "folder")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-
-            Section("History") {
-                Toggle("Keep a local history of transcripts", isOn: $historyEnabled)
-
-                Picker("Retention", selection: $historyRetentionDays) {
-                    Text("Keep forever").tag(0)
-                    Text("1 day").tag(1)
-                    Text("7 days").tag(7)
-                    Text("30 days").tag(30)
-                    Text("90 days").tag(90)
-                }
-                .disabled(!historyEnabled)
-
-                Stepper(
-                    "Max entries: \(historyMaxEntries)",
-                    value: $historyMaxEntries,
-                    in: 10...1000,
-                    step: 10
-                )
-                .disabled(!historyEnabled)
-
-                Text("History is encrypted at rest with AES-GCM. The key lives in your macOS Keychain and never syncs to iCloud. Records are stored in ~/Library/Application Support/WhisperLocal/history.bin.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section("Hotkey") {
-                LabeledContent("Record / Stop") {
+    private var hotkeyTab: some View {
+        Form {
+            Section("Record / Stop") {
+                LabeledContent("Shortcut") {
                     HStack(spacing: 8) {
                         HotkeyRecorderView(
                             keyCode: $hotkeyKeyCode,
@@ -318,13 +345,12 @@ struct SettingsView: View {
                      : "Click the field and press a new combo. Requires at least one modifier (⌘/⌥/⌃/⇧). Press ⎋ to cancel.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
 
-                Toggle("Use Fn (🌐) key instead (experimental)", isOn: $fnKeyEnabled)
+            Section("Fn key (experimental)") {
+                Toggle("Use Fn (🌐) key instead", isOn: $fnKeyEnabled)
                     .onChange(of: fnKeyEnabled) { isOn in
                         if isOn {
-                            // Surface the Input Monitoring prompt as soon as
-                            // the user opts in. If macOS hasn't granted it
-                            // yet this also opens the System Settings pane.
                             let granted = PermissionsCoordinator().requestInputMonitoring()
                             if !granted {
                                 PermissionsCoordinator().openInputMonitoringSettings()
@@ -335,7 +361,7 @@ struct SettingsView: View {
                 if fnKeyEnabled {
                     VStack(alignment: .leading, spacing: 6) {
                         Label {
-                            Text("macOS reserves Fn for Dictation / Show Emoji / Change Input Source. There is no public API to rebind it. Open System Settings → Keyboard → \"Press 🌐 key to → Do Nothing\" to avoid duplicate actions.")
+                            Text("macOS reserves Fn for Dictation / Show Emoji / Change Input Source. Open System Settings → Keyboard → \"Press 🌐 key to → Do Nothing\" to avoid duplicate actions.")
                         } icon: {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.orange)
@@ -354,25 +380,76 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
                 }
             }
+        }
+        .formStyle(.grouped)
+    }
 
-            Section {
-                Text("Preferences live in ~/Library/Preferences/. API keys are stored separately in the macOS Keychain. Local Whisper runs entirely on this Mac — no bytes leave the machine.")
-                    .font(.caption2)
+    // MARK: - Tab: History & Privacy
+
+    private var historyPrivacyTab: some View {
+        Form {
+            Section("Transcript history") {
+                Toggle("Keep a local history", isOn: $historyEnabled)
+
+                Picker("Retention", selection: $historyRetentionDays) {
+                    Text("Keep forever").tag(0)
+                    Text("1 day").tag(1)
+                    Text("7 days").tag(7)
+                    Text("30 days").tag(30)
+                    Text("90 days").tag(90)
+                }
+                .disabled(!historyEnabled)
+
+                Stepper(
+                    "Max entries: \(historyMaxEntries)",
+                    value: $historyMaxEntries,
+                    in: 10...1000,
+                    step: 10
+                )
+                .disabled(!historyEnabled)
+
+                Text("History is encrypted at rest with AES-GCM. The key lives in the macOS Keychain and never syncs to iCloud. File: ~/Library/Application Support/WhisperLocal/history.bin.")
+                    .font(.caption)
                     .foregroundColor(.secondary)
+            }
+
+            Section("Audio retention") {
+                Picker("Keep recordings", selection: $audioRetention) {
+                    ForEach(AudioRetention.allCases) { r in
+                        Text(r.displayName).tag(r)
+                    }
+                }
+                Button("Wipe all recorded audio now") {
+                    AudioRetentionSweeper.wipeAll()
+                }
+            }
+
+            Section("Privacy notes") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label {
+                        Text("Cloud providers (OpenAI, OpenRouter, Groq) receive your audio. Pick Local whisper.cpp in Providers for fully offline transcription.")
+                    } icon: {
+                        Image(systemName: "cloud.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    Label {
+                        Text("Clipboard managers (Paste, Raycast, Alfred) will capture the transcript when it reaches the pasteboard. Disable auto-paste in Recording if that concerns you.")
+                    } icon: {
+                        Image(systemName: "doc.on.clipboard")
+                            .foregroundColor(.secondary)
+                    }
+                    Label {
+                        Text("Raw WAVs live in ~/Library/Caches/WhisperLocal/recordings/. API keys and the history encryption key are in the macOS Keychain with iCloud sync disabled.")
+                    } icon: {
+                        Image(systemName: "folder")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 620, height: 1220)
-        .onAppear {
-            normalizeStorageValues()
-            reloadKeys()
-            refreshLaunchAtLoginState()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .whisperLocalSettingsWillShow)) { _ in
-            normalizeStorageValues()
-            reloadKeys()
-            refreshLaunchAtLoginState()
-        }
     }
 
     // MARK: - Subviews
@@ -466,11 +543,6 @@ struct SettingsView: View {
     }
 
     private func refreshLaunchAtLoginState() {
-        // Programmatic writes to launchAtLoginEnabled MUST go through the
-        // suppression flag, otherwise .onChange fires and calls setEnabled()
-        // again — turning a passive resync into an active round-trip to
-        // SMAppService. This catches both the onAppear path and the
-        // settings-will-show notification.
         let actual = LaunchAtLoginController.isEnabled
         if actual != launchAtLoginEnabled {
             suppressLaunchAtLoginChange = true

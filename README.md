@@ -5,7 +5,9 @@
 приложение, где ты сейчас печатаешь. Жмёшь `⌥⌘5`, говоришь, снова жмёшь
 `⌥⌘5`, транскрипт оказывается у курсора.
 
-Статус: **0.1.0** — первый MVP, ad-hoc подписан, собран одним разработчиком.
+Статус: **0.2.2** — personal build. Подписан стабильным локальным
+self-signed сертификатом (`whisper-hot-local`), не нотаризован,
+собран одним разработчиком.
 
 ## Что делает
 
@@ -41,7 +43,7 @@ API-ключа в Keychain, приложение подтягивает прав
 
 ## Установка
 
-1. Скачай `WhisperLocal-0.1.0.dmg`.
+1. Скачай `WhisperLocal-0.2.2.dmg`.
 2. Открой DMG, перетащи `WhisperLocal.app` на ярлык Applications, размонтируй.
 3. Первый запуск из `/Applications/WhisperLocal.app` упрётся в Gatekeeper
    (сборка ad-hoc подписана, не нотаризована). Правый клик по приложению,
@@ -89,31 +91,33 @@ Accessibility не выдан, WhisperLocal сам стал frontmost), тран
 
 ## Настраиваемые штуки
 
-Всё через **Settings…** в menu bar:
+Всё через **Settings…** в menu bar. С 0.2.2 настройки разбиты на
+5 вкладок — окно resizable, ничего больше не клипается снизу.
 
-- **General** — Launch at login (через `SMAppService.mainApp`).
-- **Provider** — OpenAI / OpenRouter / Groq / Local whisper.cpp.
-- **API keys** — отдельные Keychain слоты для OpenAI, OpenRouter, Groq.
-  Local whisper.cpp вместо ключа требует путь к бинарю + путь к GGML
-  модели.
-- **Transcription** — выбор модели под провайдера, выбор языка
-  (auto + 15 языков).
-- **After transcription** — тумблер auto-paste, тумблер звуковых
-  сигналов.
-- **Indicator** — menubar-only / mini pill / classic waveform.
-- **Hotkey** — `⌥⌘5` зашит в 0.1.0. Доступен экспериментальный opt-in
-  на Fn (🌐) клавишу, но это хрупко потому что macOS резервирует Fn
-  под Dictation / Show Emoji.
-- **Post-processing** — опциональный LLM cleanup с пресетами
-  (Cleanup, Email style, Slack casual, Technical docs,
-  Translate to English, Custom). Использует твой OpenRouter ключ.
-- **Privacy & data** — retention для аудио (Immediate / 1h / 24h /
-  Until quit / Forever), явная кнопка Wipe, раскрытие того что
-  уходит с твоего Mac.
-- **History** — выключена по умолчанию. Когда включена, транскрипты
-  идут в AES-GCM зашифрованный файл в
-  `~/Library/Application Support/WhisperLocal/`. Retention:
-  forever / 1 / 7 / 30 / 90 days плюс лимит на количество записей.
+- **Recording** — язык (auto + 15 языков), auto-paste в активное
+  приложение, звуковые chimes, стиль индикатора
+  (menubar-only / mini pill / classic waveform), Launch at login
+  через `SMAppService.mainApp`.
+- **Providers** — один picker сверху выбирает сервис (OpenAI /
+  OpenRouter / Groq / Local whisper.cpp). Ниже показываются только
+  поля выбранного провайдера: API-ключ + model picker, либо пути
+  к `whisper.cpp` бинарю + GGML модели для локального режима.
+  У каждого провайдера свой слот в Keychain, переключение не
+  требует рестарта.
+- **Post-processing** — тумблер LLM cleanup после транскрибации и
+  выбор пресета (Cleanup fillers, Email style, Slack casual,
+  Technical docs, Translate to English, Custom). Использует твой
+  OpenRouter ключ из Providers. Выключено по умолчанию.
+- **Hotkey** — кастомный рекордер (`⌥⌘5` по умолчанию, кнопка
+  Reset возвращает его). Рядом экспериментальный Fn (🌐) тумблер:
+  хрупко, потому что macOS резервирует Fn под Dictation / Show
+  Emoji, но если Input Monitoring выдан — работает.
+- **History & Privacy** — тумблер локальной истории транскриптов
+  (выключен по умолчанию; когда включён, AES-GCM в
+  `~/Library/Application Support/WhisperLocal/history.bin`
+  с retention forever / 1 / 7 / 30 / 90 days и лимитом записей),
+  retention для сырого аудио (Immediate / 1h / 24h / Until quit /
+  Forever), кнопка Wipe всего аудио, сводка приватности.
 
 ## Приватность
 
@@ -141,8 +145,22 @@ Accessibility не выдан, WhisperLocal сам стал frontmost), тран
 
 ## Сборка из исходников
 
-Нужны Xcode Command Line Tools (macOS SDK и `swift` CLI). Полный
-Xcode.app НЕ требуется.
+Нужны Xcode Command Line Tools (macOS SDK, `swift` CLI, `cc`).
+Полный Xcode.app НЕ требуется.
+
+**Один раз на машину** — создать стабильную codesigning identity:
+
+```bash
+./scripts/create-signing-identity.sh
+```
+
+Скрипт интерактивный: спросит твой macOS логин-пароль один раз,
+сгенерит self-signed сертификат `whisper-hot-local` в login keychain
+и прогонит end-to-end signing probe. Без этого `build.sh` откажется
+собирать. Почему так — см. ARCHITECTURE.md → "Стабильная подпись
+вместо ad-hoc".
+
+Дальше обычная сборка:
 
 ```bash
 ./build.sh
@@ -162,13 +180,16 @@ File Provider переприклеивает `com.apple.FinderInfo` и
 ./build-dmg.sh
 ```
 
-Пишет `WhisperLocal-0.1.0.dmg` рядом с .app.
+Пишет `WhisperLocal-<version>.dmg` рядом с .app (сейчас
+`WhisperLocal-0.2.2.dmg`).
 
-## Известные ограничения 0.1.0
+## Известные ограничения
 
-- Хоткей зашит как `⌥⌘5`. Рекордера для смены пока нет.
-- Ad-hoc подписан, не нотаризован. Первый запуск всегда требует
-  right-click → Open. Developer ID подпись + нотаризация отложены.
+- Подпись — локальный self-signed cert, не Developer ID, не
+  нотаризован. Первый запуск свежеустановленной копии всё равно
+  упрётся в Gatekeeper (right-click → Open один раз). Между
+  пересборками идентичность стабильна, так что Keychain ACL и
+  TCC grants переживают.
 - `.untilQuit` audio retention работает по принципу best-effort.
   Force-quit или краш пропускают `applicationWillTerminate`, и
   cleanup делает startup sweep на следующем запуске.

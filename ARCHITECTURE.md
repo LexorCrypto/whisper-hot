@@ -1,7 +1,7 @@
 # Архитектура
 
-WhisperLocal — это Swift 5.9 / SwiftPM macOS приложение. 31 Swift
-файл, ~4600 строк. AppKit — основная оболочка, SwiftUI живёт внутри
+WhisperLocal — это Swift 5.9 / SwiftPM macOS приложение. 32 Swift
+файла, ~5100 строк. AppKit — основная оболочка, SwiftUI живёт внутри
 Settings, Onboarding, History и recording indicator через
 `NSHostingView`.
 
@@ -64,7 +64,7 @@ Sources/WhisperLocal/
 │
 ├── Settings/
 │   ├── Preferences.swift         UserDefaults ключи + типизированные accessors
-│   └── SettingsView.swift        SwiftUI Form внутри NSHostingView
+│   └── SettingsView.swift        SwiftUI TabView (5 вкладок) внутри NSHostingView
 │
 ├── SettingsWindowController.swift  NSWindow host для SettingsView
 │
@@ -251,6 +251,48 @@ all. Он никогда не создаёт молча replacement ключ, к
 Точное позиционирование эвристическое ("top-center видимой
 области, 12pt ниже menu bar"), не идеальное под Stage Manager,
 но корректное для общего случая.
+
+### Стабильная подпись вместо ad-hoc
+
+До 0.2.1 `build.sh` подписывал `.app` ad-hoc (`codesign --sign -`).
+Ad-hoc identity выводится из code-directory-хэша бинаря, поэтому
+каждая пересборка давала новый designated requirement. Все
+Keychain items, ACL которых трастил предыдущую идентичность,
+начинали выпрашивать login-пароль на каждый доступ. Та же проблема
+и с TCC grants (Accessibility, Microphone): смена подписи = новое
+приложение в глазах macOS.
+
+0.2.1+ подписывается стабильным self-signed сертификатом
+`whisper-hot-local` из login keychain пользователя. SHA-1 cert'а
+фиксирован между пересборками, так что после одного клика
+"Always Allow" на первом запуске новой идентичности все последующие
+сборки молчат. Сертификат создаётся однократно через
+`scripts/create-signing-identity.sh` — идемпотентный скрипт, который
+генерит RSA 2048 + self-signed X.509 с `extendedKeyUsage codeSigning`,
+заливает его через `security import` + `set-key-partition-list`,
+пишет user-domain trust через `add-trusted-cert`, и прогоняет
+end-to-end signing probe (компилит stub Mach-O, подписывает,
+верифицирует). Любая ошибка на любом шаге валит скрипт.
+
+`build.sh` резолвит identity через `security find-identity -p
+codesigning` по CN. Если identity отсутствует или найдены
+дубликаты — скрипт падает с инструкцией запустить one-shot setup.
+Ad-hoc fallback не предусмотрен специально: тихий откат на ad-hoc
+был бы именно тем регрессом, от которого мы ушли.
+
+Два макОС-specific gotchas зашиты в комментарии
+`scripts/create-signing-identity.sh` шаг [2/7]:
+
+1. OpenSSL 3.x держит PBE-SHA1-3DES / RC2 / MD5 за "legacy provider",
+   который не загружен по умолчанию. Без `-legacy` флага
+   `-keypbe`/`-certpbe` тихо игнорируются, и файл выходит
+   AES-256-CBC + SHA-256, который Apple `security import` не
+   понимает.
+2. Apple `security` на macOS 13+ отвергает PKCS#12 с пустым
+   passphrase, выдавая `MAC verification failed during PKCS12
+   import (wrong password?)`, даже если формат правильный. Скрипт
+   генерит случайный transport passphrase через `openssl rand -hex`,
+   передаёт в обе команды, и отпускает его с tempdir'ом.
 
 ### iCloud-safe build output
 
