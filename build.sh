@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-APP_NAME="WhisperLocal"
+APP_NAME="WhisperHot"
 BUILD_CONFIG="${BUILD_CONFIG:-release}"
 SIGNING_COMMON_NAME="whisper-hot-local"
 
@@ -56,7 +56,7 @@ resolve_signing_identity() {
 # detritus not allowed".
 #
 # Assemble and sign the .app outside of the iCloud-synced tree instead.
-BUILD_OUT_DIR="${BUILD_OUT_DIR:-${HOME}/Library/Caches/WhisperLocal-build}"
+BUILD_OUT_DIR="${BUILD_OUT_DIR:-${HOME}/Library/Caches/WhisperHot-build}"
 APP_BUNDLE="${BUILD_OUT_DIR}/${APP_NAME}.app"
 
 echo "[1/5] swift build -c ${BUILD_CONFIG}"

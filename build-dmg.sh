@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build a distributable .dmg containing WhisperLocal.app and an
+# Build a distributable .dmg containing WhisperHot.app and an
 # Applications-folder symlink. Ad-hoc signed, no notarization — fine for
 # personal / side-loading distribution. Run from the project root.
 
 cd "$(dirname "$0")"
 
-APP_NAME="WhisperLocal"
-BUILD_OUT_DIR="${BUILD_OUT_DIR:-${HOME}/Library/Caches/WhisperLocal-build}"
+APP_NAME="WhisperHot"
+BUILD_OUT_DIR="${BUILD_OUT_DIR:-${HOME}/Library/Caches/WhisperHot-build}"
 
 # Sanity-check BUILD_OUT_DIR before we ever hand it to `rm -rf`. The env
 # override is convenient for tooling but it must not be a shared or root

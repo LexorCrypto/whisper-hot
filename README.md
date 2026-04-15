@@ -1,13 +1,14 @@
-# WhisperLocal
+# WhisperHot
 
 Локальное macOS-приложение в строке меню, которое записывает твой голос,
 транскрибирует его через выбранного провайдера и вставляет текст в то
 приложение, где ты сейчас печатаешь. Жмёшь `⌥⌘5`, говоришь, снова жмёшь
 `⌥⌘5`, транскрипт оказывается у курсора.
 
-Статус: **0.2.2** — personal build. Подписан стабильным локальным
+Статус: **0.3.0** — personal build. Подписан стабильным локальным
 self-signed сертификатом (`whisper-hot-local`), не нотаризован,
-собран одним разработчиком.
+собран одним разработчиком. До 0.2.2 приложение называлось
+WhisperLocal; 0.3.0 — переименование.
 
 ## Что делает
 
@@ -43,9 +44,9 @@ API-ключа в Keychain, приложение подтягивает прав
 
 ## Установка
 
-1. Скачай `WhisperLocal-0.2.2.dmg`.
-2. Открой DMG, перетащи `WhisperLocal.app` на ярлык Applications, размонтируй.
-3. Первый запуск из `/Applications/WhisperLocal.app` упрётся в Gatekeeper
+1. Скачай `WhisperHot-0.3.0.dmg`.
+2. Открой DMG, перетащи `WhisperHot.app` на ярлык Applications, размонтируй.
+3. Первый запуск из `/Applications/WhisperHot.app` упрётся в Gatekeeper
    (сборка ad-hoc подписана, не нотаризована). Правый клик по приложению,
    выбери **Open**, подтверди один раз. После этого macOS запомнит.
 4. Иконка микрофона появится в menu bar, справа сверху. Если у тебя
@@ -61,7 +62,7 @@ API-ключа в Keychain, приложение подтягивает прав
 - **Microphone** — обязательно. Клик по Request Access, macOS покажет
   системный промпт, жмёшь Allow.
 - **Accessibility** — обязательно для auto-paste в другие приложения.
-  Клик Open Settings, включи WhisperLocal в Privacy & Security →
+  Клик Open Settings, включи WhisperHot в Privacy & Security →
   Accessibility. Окно онбординга опрашивает состояние каждые 2 секунды,
   перезапускать приложение после grant'а не нужно.
 
@@ -85,7 +86,7 @@ OpenAI API-ключ (или OpenRouter / Groq — что выбрал в Provide
    в курсор. Слышишь done chime.
 
 Если auto-paste не прошёл guards (фокус изменился, secure input field,
-Accessibility не выдан, WhisperLocal сам стал frontmost), транскрипт
+Accessibility не выдан, WhisperHot сам стал frontmost), транскрипт
 всё равно в буфере, а в меню появляется строка с объяснением что
 случилось. Текст не теряется никогда.
 
@@ -114,14 +115,14 @@ Accessibility не выдан, WhisperLocal сам стал frontmost), тран
   Emoji, но если Input Monitoring выдан — работает.
 - **History & Privacy** — тумблер локальной истории транскриптов
   (выключен по умолчанию; когда включён, AES-GCM в
-  `~/Library/Application Support/WhisperLocal/history.bin`
+  `~/Library/Application Support/WhisperHot/history.bin`
   с retention forever / 1 / 7 / 30 / 90 days и лимитом записей),
   retention для сырого аудио (Immediate / 1h / 24h / Until quit /
   Forever), кнопка Wipe всего аудио, сводка приватности.
 
 ## Приватность
 
-- **Аудиофайлы** живут в `~/Library/Caches/WhisperLocal/recordings/`
+- **Аудиофайлы** живут в `~/Library/Caches/WhisperHot/recordings/`
   как 16 kHz mono 16-bit WAV. Retention по умолчанию:
   "удалять сразу после успешной транскрибации". Startup sweep
   чистит остатки от прошлых запусков (например, транскрибацию,
@@ -167,7 +168,7 @@ Accessibility не выдан, WhisperLocal сам стал frontmost), тран
 ```
 
 Запускает `swift build -c release` и собирает подписанный `.app`
-bundle в `~/Library/Caches/WhisperLocal-build/WhisperLocal.app`.
+bundle в `~/Library/Caches/WhisperHot-build/WhisperHot.app`.
 Вывод сборки лежит вне iCloud-синкаемого дерева проекта специально:
 File Provider переприклеивает `com.apple.FinderInfo` и
 `com.apple.fileprovider.fpfs#P` xattrs к файлам под `~/Documents/`
@@ -180,8 +181,8 @@ File Provider переприклеивает `com.apple.FinderInfo` и
 ./build-dmg.sh
 ```
 
-Пишет `WhisperLocal-<version>.dmg` рядом с .app (сейчас
-`WhisperLocal-0.2.2.dmg`).
+Пишет `WhisperHot-<version>.dmg` рядом с .app (сейчас
+`WhisperHot-0.3.0.dmg`).
 
 ## Известные ограничения
 

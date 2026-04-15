@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "WhisperLocal",
+    name: "WhisperHot",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "WhisperLocal",
-            path: "Sources/WhisperLocal"
+            name: "WhisperHot",
+            path: "Sources/WhisperHot"
         )
     ]
 )

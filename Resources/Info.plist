@@ -5,27 +5,27 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>WhisperLocal</string>
+    <string>WhisperHot</string>
     <key>CFBundleIdentifier</key>
-    <string>com.aleksejsupilin.WhisperLocal</string>
+    <string>com.aleksejsupilin.WhisperHot</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>WhisperLocal</string>
+    <string>WhisperHot</string>
     <key>CFBundleDisplayName</key>
-    <string>WhisperLocal</string>
+    <string>WhisperHot</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.2</string>
+    <string>0.3.0</string>
     <key>CFBundleVersion</key>
-    <string>4</string>
+    <string>5</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>WhisperLocal records audio to transcribe your voice to text.</string>
+    <string>WhisperHot records audio to transcribe your voice to text.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

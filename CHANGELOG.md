@@ -1,6 +1,71 @@
 # Changelog
 
-Все значимые изменения в WhisperLocal.
+Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
+
+## [0.3.0] — 2026-04-16
+
+Переименование WhisperLocal → WhisperHot и переделка menu bar меню.
+
+### Для пользователей
+
+- **Новое имя — WhisperHot.** Всё, что ты видишь: имя в строке
+  меню, окна Settings и History, alert'ы, About — теперь говорит
+  WhisperHot. Bundle ID стал `com.aleksejsupilin.WhisperHot`, а
+  старый `/Applications/WhisperLocal.app` уходит в утиль. Репозиторий
+  всегда назывался `whisper-hot`, теперь и приложение совпадает.
+- **Статус-меню с контекстом.** Верхняя строка меню теперь показывает,
+  какой провайдер активен (и какая модель у него выбрана), плюс
+  текущий хоткей. Вторая строка — "Hotkey: ⌥⌘5". Раньше надо было
+  открывать Settings, чтобы вспомнить, где ты находишься.
+- **Быстрый свитч провайдера прямо из меню.** Новый пункт **Provider ►**
+  с четырьмя опциями (OpenAI / OpenRouter / Groq / Local whisper.cpp).
+  Текущий помечен галочкой. Выбор пишет preference мгновенно, на
+  следующей записи новый провайдер уже активен.
+- **History получила шорткат `⌘H`.** Settings остался на `⌘,`,
+  Quit — на `⌘Q`. About WhisperHot показывает версию, билд и
+  подписывающую identity.
+- **Permissions & Onboarding переименован** из "Onboarding &
+  Permissions…" — новое имя ставит то, что чаще ищут (Permissions),
+  первым.
+
+### Важно при апгрейде
+
+- **macOS видит WhisperHot как новое приложение.** Bundle ID
+  изменился, поэтому TCC (Accessibility, Microphone) и Keychain ACL
+  надо выдать заново. Один раз. Снеси `/Applications/WhisperLocal.app`,
+  поставь `WhisperHot-0.3.0.dmg`, зайди в System Settings → Privacy &
+  Security → Accessibility, добавь WhisperHot.
+- **Старые Keychain items с префиксом `com.aleksejsupilin.WhisperLocal`
+  остаются в связке ключей, но не используются.** Удалить их можно
+  вручную через Keychain Access или оставить — WhisperHot под новым
+  service name их не трогает.
+- **UserDefaults с префиксом `WhisperLocal.*` больше не читаются.**
+  Все твои настройки (провайдер, язык, хоткей, история, audio
+  retention) сбрасываются до defaults. Зайди в Settings и выстави
+  заново.
+
+### Для контрибуторов
+
+- Полный rename по 28 файлам: Package.swift, Resources/Info.plist,
+  build.sh, build-dmg.sh, `Sources/WhisperLocal/` → `Sources/WhisperHot/`
+  (git mv, 31 файл), `WhisperLocalApp.swift` → `WhisperHotApp.swift`.
+  Все строковые константы (Keychain `serviceName`, UserDefaults
+  key-префикс, NotificationCenter names, NSLog tags, path components,
+  window titles) прошли через `sed s/WhisperLocal/WhisperHot/g +
+  s/whisperLocal/whisperHot/g`.
+- `MenuBarController.swift` стал `NSMenuDelegate`. Новые поля:
+  `headerMenuItem` (disabled status row с `.attributedTitle`),
+  `providerSubmenu` (хранится для обновления checkmark'а).
+  `menuWillOpen(_:)` вызывает `refreshDynamicMenuState()`, который
+  пересчитывает текст хедера и галочку в submenu из
+  `Preferences.provider` / `.currentModel` / hotkey values —
+  никаких global observer'ов на preference changes.
+- `TranscriptionProvider` получил `shortName` computed property
+  для компактного отображения в хедере (OpenAI / OpenRouter /
+  Groq / Local). Полный `displayName` остаётся в Settings picker'е.
+- Внутренний `serviceName` в `Keychain.swift` теперь
+  `com.aleksejsupilin.WhisperHot`. История мигрирует per-install:
+  старые items не читаются, новые пишутся под новым service.
 
 ## [0.2.2] — 2026-04-16
 
