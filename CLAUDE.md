@@ -1,21 +1,21 @@
 # WhisperHot
 
-## Skill routing
+## Маршрутизация навыков (Skill routing)
 
-When the user's request matches an available skill, ALWAYS invoke it using the Skill
-tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
-The skill has specialized workflows that produce better results than ad-hoc answers.
+Когда запрос пользователя совпадает с доступным навыком, ВСЕГДА вызывай его через
+Skill tool КАК ПЕРВОЕ действие. НЕ отвечай напрямую, НЕ используй другие инструменты первыми.
+Навык имеет специализированные процессы, которые дают лучшие результаты.
 
-Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
-- Save progress, checkpoint, resume → invoke checkpoint
-- Code quality, health check → invoke health
+Правила маршрутизации:
+- Идеи продукта, "стоит ли это делать", мозговой штурм → invoke office-hours
+- Баги, ошибки, "почему это сломалось", 500 ошибки → invoke investigate
+- Деплой, пуш, создать PR → invoke ship
+- QA, тестирование, поиск багов → invoke qa
+- Код-ревью, проверить мой дифф → invoke review
+- Обновить документацию после релиза → invoke document-release
+- Еженедельная ретроспектива → invoke retro
+- Дизайн-система, бренд → invoke design-consultation
+- Визуальный аудит, полировка дизайна → invoke design-review
+- Архитектурный обзор → invoke plan-eng-review
+- Сохранить прогресс, чекпоинт, возобновить → invoke checkpoint
+- Качество кода, проверка здоровья → invoke health

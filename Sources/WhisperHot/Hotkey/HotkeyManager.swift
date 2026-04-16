@@ -27,9 +27,15 @@ final class HotkeyManager {
     /// exactly as it was at the moment the user pressed the combo.
     var onHotkey: (() -> Void)?
 
+    /// Invoked when the "raw output" hotkey fires (same combo + Shift).
+    /// Signals that post-processing should be skipped for this recording.
+    var onRawHotkey: (() -> Void)?
+
     private var hotkeyRef: EventHotKeyRef?
+    private var rawHotkeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
     private static let hotkeyID: UInt32 = 0x776C_686B // 'wlhk'
+    private static let rawHotkeyID: UInt32 = 0x776C_7261 // 'wlra'
     private static let signature: OSType = 0x574C_486B // 'WLHk'
 
     deinit {
@@ -44,8 +50,9 @@ final class HotkeyManager {
         }
     }
 
-    /// Register the given combo. Replaces any previous registration.
-    /// Returns true on success. Main-thread only.
+    /// Register the given combo and its Shift variant (raw output).
+    /// Replaces any previous registration. Returns true on success.
+    /// Main-thread only.
     @discardableResult
     func register(combo: Combo = .defaultCombo) -> Bool {
         dispatchPrecondition(condition: .onQueue(.main))
@@ -53,6 +60,7 @@ final class HotkeyManager {
 
         installEventHandlerIfNeeded()
 
+        // Primary hotkey (e.g. ⌥⌘5)
         let id = EventHotKeyID(signature: Self.signature, id: Self.hotkeyID)
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
@@ -69,8 +77,32 @@ final class HotkeyManager {
             removeEventHandler()
             return false
         }
-
         self.hotkeyRef = ref
+
+        // Raw output hotkey (same combo + Shift, e.g. ⌥⌘⇧5).
+        // Skip if the base combo already contains Shift — the two hotkeys
+        // would be identical and raw mode wouldn't be distinguishable.
+        if combo.modifiers & UInt32(shiftKey) == 0 {
+            let rawID = EventHotKeyID(signature: Self.signature, id: Self.rawHotkeyID)
+            var rawRef: EventHotKeyRef?
+            let rawModifiers = combo.modifiers | UInt32(shiftKey)
+            let rawStatus = RegisterEventHotKey(
+                combo.keyCode,
+                rawModifiers,
+                rawID,
+                GetApplicationEventTarget(),
+                0,
+                &rawRef
+            )
+            if rawStatus != noErr {
+                NSLog("WhisperHot: RegisterEventHotKey (raw) failed with OSStatus \(rawStatus)")
+            } else {
+                self.rawHotkeyRef = rawRef
+            }
+        } else {
+            NSLog("WhisperHot: raw output hotkey skipped — base combo already includes Shift")
+        }
+
         return true
     }
 
@@ -80,6 +112,10 @@ final class HotkeyManager {
         if let ref = hotkeyRef {
             UnregisterEventHotKey(ref)
             hotkeyRef = nil
+        }
+        if let ref = rawHotkeyRef {
+            UnregisterEventHotKey(ref)
+            rawHotkeyRef = nil
         }
         removeEventHandler()
     }
@@ -121,12 +157,19 @@ final class HotkeyManager {
                 &id
             )
             guard getStatus == noErr else { return getStatus }
-            guard id.signature == HotkeyManager.signature, id.id == HotkeyManager.hotkeyID else {
+            guard id.signature == HotkeyManager.signature else {
                 return OSStatus(eventNotHandledErr)
             }
 
             let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
-            manager.onHotkey?()
+            switch id.id {
+            case HotkeyManager.hotkeyID:
+                manager.onHotkey?()
+            case HotkeyManager.rawHotkeyID:
+                manager.onRawHotkey?()
+            default:
+                return OSStatus(eventNotHandledErr)
+            }
             return noErr
         }
 

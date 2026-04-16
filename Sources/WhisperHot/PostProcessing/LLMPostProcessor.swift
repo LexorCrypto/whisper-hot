@@ -1,18 +1,23 @@
 import Foundation
 
 /// Text-in / text-out LLM call that applies a `PostProcessingPreset`
-/// transformation to a raw transcript. Uses OpenRouter's /chat/completions
-/// endpoint with a plain text user turn (no audio). The caller owns the
-/// OpenRouter API key via Keychain.
+/// transformation to a raw transcript. Uses any OpenAI-compatible
+/// /chat/completions endpoint. The caller configures the endpoint,
+/// headers, and API key source via init parameters.
 final class LLMPostProcessor: @unchecked Sendable {
-    private let endpoint = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+    private let endpoint: URL
+    private let extraHeaders: [String: String]
     private let apiKeyProvider: @Sendable () throws -> String
     private let urlSession: URLSession
 
     init(
+        endpoint: URL,
         apiKeyProvider: @escaping @Sendable () throws -> String,
+        extraHeaders: [String: String] = [:],
         urlSession: URLSession = .shared
     ) {
+        self.endpoint = endpoint
+        self.extraHeaders = extraHeaders
         self.apiKeyProvider = apiKeyProvider
         self.urlSession = urlSession
     }
@@ -51,8 +56,9 @@ final class LLMPostProcessor: @unchecked Sendable {
         request.httpMethod = "POST"
         request.setValue("Bearer \(trimmedKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("https://github.com/aleksejsupilin/whisper-local", forHTTPHeaderField: "HTTP-Referer")
-        request.setValue("WhisperHot", forHTTPHeaderField: "X-Title")
+        for (key, value) in extraHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
         request.timeoutInterval = 60
         request.httpBody = jsonData
 

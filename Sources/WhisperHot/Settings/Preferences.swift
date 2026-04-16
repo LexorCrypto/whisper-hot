@@ -27,6 +27,13 @@ enum Preferences {
         static let fnKeyEnabled = "WhisperHot.fnKeyEnabled"
         static let hotkeyKeyCode = "WhisperHot.hotkeyKeyCode"
         static let hotkeyModifiers = "WhisperHot.hotkeyModifiers"
+        static let contextRoutingEnabled = "WhisperHot.contextRoutingEnabled"
+        static let contextRules = "WhisperHot.contextRules"
+        static let postProcessingProvider = "WhisperHot.postProcessingProvider"
+        static let postProcessingModelOpenAI = "WhisperHot.postProcessingModelOpenAI"
+        static let postProcessingModelGroq = "WhisperHot.postProcessingModelGroq"
+        static let customEndpointURL = "WhisperHot.customEndpointURL"
+        static let customEndpointModel = "WhisperHot.customEndpointModel"
     }
 
     enum Defaults {
@@ -52,6 +59,12 @@ enum Preferences {
         static let fnKeyEnabled = false
         static let hotkeyKeyCode = kVK_ANSI_5
         static let hotkeyModifiers = cmdKey | optionKey
+        static let contextRoutingEnabled = false
+        static let postProcessingProvider = PostProcessingProvider.openRouter.rawValue
+        static let postProcessingModelOpenAI = "gpt-4o-mini"
+        static let postProcessingModelGroq = "llama-3.1-8b-instant"
+        static let customEndpointURL = ""
+        static let customEndpointModel = ""
     }
 
     /// Register baseline defaults so first-run reads return sensible values
@@ -78,7 +91,13 @@ enum Preferences {
             Key.audioRetention: Defaults.audioRetention,
             Key.fnKeyEnabled: Defaults.fnKeyEnabled,
             Key.hotkeyKeyCode: Defaults.hotkeyKeyCode,
-            Key.hotkeyModifiers: Defaults.hotkeyModifiers
+            Key.hotkeyModifiers: Defaults.hotkeyModifiers,
+            Key.contextRoutingEnabled: Defaults.contextRoutingEnabled,
+            Key.postProcessingProvider: Defaults.postProcessingProvider,
+            Key.postProcessingModelOpenAI: Defaults.postProcessingModelOpenAI,
+            Key.postProcessingModelGroq: Defaults.postProcessingModelGroq,
+            Key.customEndpointURL: Defaults.customEndpointURL,
+            Key.customEndpointModel: Defaults.customEndpointModel
         ])
     }
 
@@ -199,6 +218,37 @@ enum Preferences {
         UserDefaults.standard.string(forKey: Key.postProcessingModel) ?? Defaults.postProcessingModel
     }
 
+    static var ppProvider: PostProcessingProvider {
+        let raw = UserDefaults.standard.string(forKey: Key.postProcessingProvider) ?? Defaults.postProcessingProvider
+        return PostProcessingProvider(rawValue: raw) ?? .openRouter
+    }
+
+    static var postProcessingModelOpenAI: String {
+        UserDefaults.standard.string(forKey: Key.postProcessingModelOpenAI) ?? Defaults.postProcessingModelOpenAI
+    }
+
+    static var postProcessingModelGroq: String {
+        UserDefaults.standard.string(forKey: Key.postProcessingModelGroq) ?? Defaults.postProcessingModelGroq
+    }
+
+    static var customEndpointURL: String {
+        UserDefaults.standard.string(forKey: Key.customEndpointURL) ?? Defaults.customEndpointURL
+    }
+
+    static var customEndpointModel: String {
+        UserDefaults.standard.string(forKey: Key.customEndpointModel) ?? Defaults.customEndpointModel
+    }
+
+    /// The model string for the currently selected post-processing provider.
+    static var currentPostProcessingModel: String {
+        switch ppProvider {
+        case .openRouter: return postProcessingModel     // legacy key, OpenRouter namespace
+        case .openAI: return postProcessingModelOpenAI
+        case .groq: return postProcessingModelGroq
+        case .custom: return customEndpointModel
+        }
+    }
+
     /// Snapshots the current post-processing configuration into a Sendable
     /// struct so it can be handed off to a detached task without capturing
     /// UserDefaults lookups.
@@ -206,7 +256,7 @@ enum Preferences {
         PostProcessingOptions(
             preset: postProcessingPreset,
             customPrompt: postProcessingCustomPrompt,
-            model: postProcessingModel
+            model: currentPostProcessingModel
         )
     }
 
@@ -235,6 +285,36 @@ enum Preferences {
 
     static var fnKeyEnabled: Bool {
         UserDefaults.standard.bool(forKey: Key.fnKeyEnabled)
+    }
+
+    // MARK: - Context routing
+
+    static var contextRoutingEnabled: Bool {
+        UserDefaults.standard.bool(forKey: Key.contextRoutingEnabled)
+    }
+
+    /// The user's context routing rules, decoded from JSON in UserDefaults.
+    /// Falls back to the built-in defaults if nothing is saved yet.
+    static var contextRules: [ContextRule] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: Key.contextRules) else {
+                return ContextRule.defaults
+            }
+            do {
+                return try JSONDecoder().decode([ContextRule].self, from: data)
+            } catch {
+                NSLog("WhisperHot: failed to decode context rules → \(error.localizedDescription)")
+                return ContextRule.defaults
+            }
+        }
+        set {
+            do {
+                let data = try JSONEncoder().encode(newValue)
+                UserDefaults.standard.set(data, forKey: Key.contextRules)
+            } catch {
+                NSLog("WhisperHot: failed to encode context rules → \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Hotkey
@@ -314,6 +394,63 @@ enum IndicatorStyle: String, CaseIterable, Identifiable {
         case .menubar: return "Menubar only"
         case .pill: return "Mini (pill)"
         case .waveform: return "Classic (waveform)"
+        }
+    }
+}
+
+/// The LLM provider used for post-processing (text cleanup, context routing).
+/// Separate from the STT transcription provider.
+enum PostProcessingProvider: String, CaseIterable, Identifiable {
+    case openRouter = "openrouter"
+    case openAI = "openai"
+    case groq = "groq"
+    case custom = "custom"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .openRouter: return "OpenRouter"
+        case .openAI: return "OpenAI"
+        case .groq: return "Groq"
+        case .custom: return "Custom endpoint"
+        }
+    }
+
+    var keychainAccount: Keychain.Account {
+        switch self {
+        case .openRouter: return .openRouter
+        case .openAI: return .openAI
+        case .groq: return .groq
+        case .custom: return .customEndpoint
+        }
+    }
+
+    /// Returns the endpoint URL, or nil if the custom endpoint URL is invalid/empty.
+    /// Callers must handle nil by skipping post-processing or showing an error.
+    var endpoint: URL? {
+        switch self {
+        case .openRouter: return URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+        case .openAI: return URL(string: "https://api.openai.com/v1/chat/completions")!
+        case .groq: return URL(string: "https://api.groq.com/openai/v1/chat/completions")!
+        case .custom:
+            let raw = Preferences.customEndpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !raw.isEmpty, let url = URL(string: raw), url.scheme == "https" || url.scheme == "http" else {
+                return nil
+            }
+            return url
+        }
+    }
+
+    var extraHeaders: [String: String] {
+        switch self {
+        case .openRouter:
+            return [
+                "HTTP-Referer": "https://github.com/LexorCrypto/whisper-hot",
+                "X-Title": "WhisperHot"
+            ]
+        case .openAI, .groq, .custom:
+            return [:]
         }
     }
 }

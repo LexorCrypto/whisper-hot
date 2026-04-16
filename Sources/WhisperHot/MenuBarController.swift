@@ -89,7 +89,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         hotkeyManager.onHotkey = { [weak self] in
             MainActor.assumeIsolated {
-                self?.toggleRecording(nil)
+                self?.toggleRecording(nil, wantsRawOutput: false)
+            }
+        }
+        hotkeyManager.onRawHotkey = { [weak self] in
+            MainActor.assumeIsolated {
+                self?.toggleRecording(nil, wantsRawOutput: true)
             }
         }
 
@@ -465,9 +470,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     // MARK: - Actions
 
+    /// `wantsRawOutput` is true when the user pressed the Shift variant
+    /// of the hotkey (e.g. ⌥⌘⇧5), requesting raw transcript without
+    /// post-processing. The flag is captured at stop time and passed
+    /// through to `kickOffTranscription`.
+    private var pendingWantsRawOutput = false
+
     @objc private func toggleRecording(_ sender: Any?) {
+        toggleRecording(sender, wantsRawOutput: false)
+    }
+
+    private func toggleRecording(_ sender: Any?, wantsRawOutput: Bool) {
         switch state {
         case .recording:
+            pendingWantsRawOutput = wantsRawOutput
             stopRecordingFromMenu()
         case .transcribing:
             NSLog("WhisperHot: hotkey ignored — transcription in flight")
@@ -476,9 +492,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             isStartingRecording = true
             Task { @MainActor in
                 defer { self.isStartingRecording = false }
-                // Single source of truth for mic permission — the same
-                // PermissionsCoordinator the onboarding window uses, so
-                // Block 4's duplicate logic in AudioRecorder is gone.
                 let granted = await self.permissionsCoordinator.requestMicrophone()
                 if granted {
                     self.startRecordingFromMenu()
@@ -567,13 +580,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func stopRecordingFromMenu() {
+        let wantsRaw = pendingWantsRawOutput
+        pendingWantsRawOutput = false
         do {
             let url = try audioRecorder.stopRecording()
-            NSLog("WhisperHot: saved → \(url.path)")
+            NSLog("WhisperHot: saved → \(url.path)\(wantsRaw ? " (raw output requested)" : "")")
             configureButton(recording: false)
             indicatorController.hide()
             playChimeIfEnabled(.stop)
-            kickOffTranscription(audioURL: url)
+            kickOffTranscription(audioURL: url, wantsRawOutput: wantsRaw)
         } catch {
             NSLog("WhisperHot: stop error → \(error.localizedDescription)")
             state = .idle
@@ -598,7 +613,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         AudioRetentionSweeper.activeRecordingURL = nil
     }
 
-    private func kickOffTranscription(audioURL: URL) {
+    private func kickOffTranscription(audioURL: URL, wantsRawOutput: Bool = false) {
         state = .transcribing
         recordMenuItem?.title = "Transcribing…"
 
@@ -607,17 +622,41 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         options.model = Preferences.currentModel
         options.language = Preferences.language
 
+        // If the user requested raw output (⌥⌘⇧5), skip post-processing entirely.
+        let skipPostProcessing = wantsRawOutput || !Preferences.postProcessingEnabled
+
         // Snapshot post-processing configuration on the main actor before
         // handing it off to the detached task. If post-processing is
         // disabled the snapshot is nil and the task skips the extra hop.
-        let postProcessor: LLMPostProcessor? = Preferences.postProcessingEnabled
-            ? LLMPostProcessor(
-                apiKeyProvider: { try Keychain.readAPIKey(account: .openRouter) }
-              )
-            : nil
-        let postProcessingOptions: PostProcessingOptions? = Preferences.postProcessingEnabled
-            ? Preferences.currentPostProcessingOptions
-            : nil
+        let ppProvider = Preferences.ppProvider
+        let postProcessor: LLMPostProcessor?
+        if skipPostProcessing {
+            postProcessor = nil
+        } else if let endpoint = ppProvider.endpoint {
+            postProcessor = LLMPostProcessor(
+                endpoint: endpoint,
+                apiKeyProvider: { try Keychain.readAPIKey(account: ppProvider.keychainAccount) },
+                extraHeaders: ppProvider.extraHeaders
+            )
+        } else {
+            // Custom endpoint URL is invalid/empty — skip post-processing
+            // rather than leaking credentials to a fallback URL.
+            NSLog("WhisperHot: post-processing skipped — custom endpoint URL is invalid")
+            postProcessor = nil
+        }
+
+        // When context routing is on, override the preset based on the app
+        // that was frontmost when recording started (recordingTarget).
+        var ppOptions = Preferences.currentPostProcessingOptions
+        if !skipPostProcessing && Preferences.contextRoutingEnabled {
+            let resolved = ContextRouter.resolve(
+                target: recordingTarget,
+                rules: Preferences.contextRules
+            )
+            ppOptions.preset = resolved
+            NSLog("WhisperHot: context route → \(recordingTarget?.bundleIdentifier ?? "nil") → \(resolved.rawValue)")
+        }
+        let postProcessingOptions: PostProcessingOptions? = skipPostProcessing ? nil : ppOptions
 
         // Run the transcription off the main actor so disk I/O (Data(contentsOf:))
         // and multipart body construction don't block the UI thread. The

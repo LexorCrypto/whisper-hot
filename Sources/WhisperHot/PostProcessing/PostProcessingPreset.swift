@@ -69,7 +69,7 @@ enum PostProcessingError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "OpenRouter API key is not set for post-processing. Open Settings and save a key."
+            return "API key is not set for the post-processing provider. Open Settings and save a key."
         case .networkFailure(let err):
             return "Post-processing network error: \(err.localizedDescription)"
         case .httpError(let status, let body):
