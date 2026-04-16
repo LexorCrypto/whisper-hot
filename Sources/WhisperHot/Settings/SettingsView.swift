@@ -38,6 +38,7 @@ struct SettingsView: View {
     @AppStorage(Preferences.Key.postProcessingModelGroq) private var ppModelGroq: String = Preferences.Defaults.postProcessingModelGroq
     @AppStorage(Preferences.Key.customEndpointURL) private var customEndpointURL: String = Preferences.Defaults.customEndpointURL
     @AppStorage(Preferences.Key.customEndpointModel) private var customEndpointModel: String = Preferences.Defaults.customEndpointModel
+    @AppStorage(Preferences.Key.appLanguage) private var appLanguage: AppLanguage = .ru
 
     @State private var launchAtLoginEnabled: Bool = LaunchAtLoginController.isEnabled
     @State private var launchAtLoginStatus: String = LaunchAtLoginController.statusDescription
@@ -84,11 +85,11 @@ struct SettingsView: View {
 
         var label: String {
             switch self {
-            case .recording: return "Recording"
-            case .providers: return "Providers"
-            case .postProcessing: return "Post-processing"
-            case .hotkey: return "Hotkey"
-            case .historyPrivacy: return "History & Privacy"
+            case .recording: return L10n.recording
+            case .providers: return L10n.providers
+            case .postProcessing: return L10n.postProcessing
+            case .hotkey: return L10n.hotkey
+            case .historyPrivacy: return L10n.historyPrivacy
             }
         }
 
@@ -150,8 +151,16 @@ struct SettingsView: View {
 
     private var recordingTab: some View {
         Form {
-            Section("Language") {
-                Picker("Language", selection: $language) {
+            Section(L10n.interfaceLanguage) {
+                Picker(L10n.interfaceLanguage, selection: $appLanguage) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+            }
+
+            Section(L10n.language) {
+                Picker(L10n.language, selection: $language) {
                     Text("Auto detect").tag(TranscriptionLanguage.auto)
                     Text("English").tag(TranscriptionLanguage.en)
                     Text("Русский").tag(TranscriptionLanguage.ru)
@@ -168,21 +177,21 @@ struct SettingsView: View {
                     Text("한국어").tag(TranscriptionLanguage.ko)
                     Text("中文").tag(TranscriptionLanguage.zh)
                 }
-                Text("Passed to every provider as a language hint. Auto-detect uses the provider's own detection.")
+                Text(L10n.languageHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Section("After transcription") {
-                Toggle("Auto-paste into the active app", isOn: $autoPaste)
-                Toggle("Play sound chimes", isOn: $sounds)
-                Text("Auto-paste requires Accessibility permission. If nothing pastes, open System Settings → Privacy & Security → Accessibility and re-enable WhisperHot.")
+            Section(L10n.afterTranscription) {
+                Toggle(L10n.autoPasteToggle, isOn: $autoPaste)
+                Toggle(L10n.soundChimesToggle, isOn: $sounds)
+                Text(L10n.autoPasteHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Section("Indicator") {
-                Picker("Style", selection: $indicatorStyle) {
+            Section(L10n.indicator) {
+                Picker(L10n.style, selection: $indicatorStyle) {
                     ForEach(IndicatorStyle.allCases) { style in
                         Text(style.displayName).tag(style)
                     }
@@ -190,8 +199,8 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
             }
 
-            Section("Startup") {
-                Toggle("Launch at login", isOn: $launchAtLoginEnabled)
+            Section(L10n.startup) {
+                Toggle(L10n.launchAtLogin, isOn: $launchAtLoginEnabled)
                     .onChange(of: launchAtLoginEnabled) { newValue in
                         if suppressLaunchAtLoginChange {
                             suppressLaunchAtLoginChange = false
@@ -224,13 +233,13 @@ struct SettingsView: View {
 
     private var providersTab: some View {
         Form {
-            Section("Service") {
-                Picker("Provider", selection: $provider) {
+            Section(L10n.service) {
+                Picker(L10n.provider, selection: $provider) {
                     ForEach(TranscriptionProvider.allCases) { p in
                         Text(p.displayName).tag(p)
                     }
                 }
-                Text(providerDescription)
+                Text(L10n.providerDescription(for: provider))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -342,15 +351,15 @@ struct SettingsView: View {
 
     private var postProcessingTab: some View {
         Form {
-            Section("LLM cleanup") {
-                Toggle("Run LLM cleanup after transcription", isOn: $postProcessingEnabled)
-                Text("Sends the raw transcript through an LLM to clean fillers, rewrite for tone, or translate. Costs one extra API call per recording. Tip: press ⌥⌘⇧5 instead of ⌥⌘5 to skip cleanup and paste raw text.")
+            Section(L10n.llmCleanup) {
+                Toggle(L10n.llmCleanupToggle, isOn: $postProcessingEnabled)
+                Text(L10n.llmCleanupHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Section("Provider") {
-                Picker("Post-processing provider", selection: $ppProvider) {
+            Section(L10n.providers) {
+                Picker(L10n.ppProvider, selection: $ppProvider) {
                     ForEach(PostProcessingProvider.allCases) { p in
                         Text(p.displayName).tag(p)
                     }
@@ -361,8 +370,8 @@ struct SettingsView: View {
                     .disabled(!postProcessingEnabled)
             }
 
-            Section("Preset") {
-                Picker("Preset", selection: $postProcessingPreset) {
+            Section(L10n.preset) {
+                Picker(L10n.preset, selection: $postProcessingPreset) {
                     ForEach(PostProcessingPreset.allCases) { preset in
                         Text(preset.displayName).tag(preset)
                     }
@@ -371,7 +380,7 @@ struct SettingsView: View {
 
                 if postProcessingPreset == .custom {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Custom system prompt")
+                        Text(L10n.customSystemPrompt)
                             .font(.caption)
                             .foregroundColor(.secondary)
                         TextEditor(text: $postProcessingCustomPrompt)
@@ -386,10 +395,10 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Context routing") {
-                Toggle("Auto-select preset based on active app", isOn: $contextRoutingEnabled)
+            Section(L10n.contextRouting) {
+                Toggle(L10n.contextRoutingToggle, isOn: $contextRoutingEnabled)
                     .disabled(!postProcessingEnabled)
-                Text("When enabled, the preset is chosen automatically based on the app you're dictating into (e.g. Slack = casual, Mail = formal). You can customize the rules below.")
+                Text(L10n.contextRoutingHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -427,7 +436,7 @@ struct SettingsView: View {
                         Preferences.contextRules = contextRules
                     }
                     HStack(spacing: 8) {
-                        Button("Add rule...") {
+                        Button(L10n.addRule) {
                             let newRule = ContextRule(
                                 bundleID: "com.example.app",
                                 label: "New App",
@@ -441,12 +450,12 @@ struct SettingsView: View {
                             }
                             Preferences.contextRules = contextRules
                         }
-                        Button("Reset to defaults") {
+                        Button(L10n.resetToDefaults) {
                             contextRules = ContextRule.defaults
                             Preferences.contextRules = contextRules
                         }
                     }
-                    Text("Tip: to find an app's bundle ID, run in Terminal: osascript -e 'id of app \"AppName\"'")
+                    Text(L10n.bundleIDTip)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -513,15 +522,15 @@ struct SettingsView: View {
 
     private var hotkeyTab: some View {
         Form {
-            Section("Record / Stop") {
-                LabeledContent("Shortcut") {
+            Section(L10n.recordStop) {
+                LabeledContent(L10n.shortcut) {
                     HStack(spacing: 8) {
                         HotkeyRecorderView(
                             keyCode: $hotkeyKeyCode,
                             modifiers: $hotkeyModifiers,
                             isDisabled: fnKeyEnabled
                         )
-                        Button("Reset") {
+                        Button(L10n.reset) {
                             hotkeyKeyCode = Preferences.Defaults.hotkeyKeyCode
                             hotkeyModifiers = Preferences.Defaults.hotkeyModifiers
                         }
@@ -536,8 +545,8 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
-            Section("Fn key (experimental)") {
-                Toggle("Use Fn (🌐) key instead", isOn: $fnKeyEnabled)
+            Section(L10n.fnKeyExperimental) {
+                Toggle(L10n.useFnKey, isOn: $fnKeyEnabled)
                     .onChange(of: fnKeyEnabled) { isOn in
                         if isOn {
                             let granted = PermissionsCoordinator().requestInputMonitoring()
@@ -577,11 +586,11 @@ struct SettingsView: View {
 
     private var historyPrivacyTab: some View {
         Form {
-            Section("Transcript history") {
-                Toggle("Keep a local history", isOn: $historyEnabled)
+            Section(L10n.transcriptHistory) {
+                Toggle(L10n.keepLocalHistory, isOn: $historyEnabled)
 
-                Picker("Retention", selection: $historyRetentionDays) {
-                    Text("Keep forever").tag(0)
+                Picker(L10n.retention, selection: $historyRetentionDays) {
+                    Text(L10n.keepForever).tag(0)
                     Text("1 day").tag(1)
                     Text("7 days").tag(7)
                     Text("30 days").tag(30)
@@ -597,38 +606,38 @@ struct SettingsView: View {
                 )
                 .disabled(!historyEnabled)
 
-                Text("History is encrypted at rest with AES-GCM. The key lives in the macOS Keychain and never syncs to iCloud. File: ~/Library/Application Support/WhisperHot/history.bin.")
+                Text(L10n.historyEncryptionHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
-            Section("Audio retention") {
-                Picker("Keep recordings", selection: $audioRetention) {
+            Section(L10n.audioRetention) {
+                Picker(L10n.keepRecordings, selection: $audioRetention) {
                     ForEach(AudioRetention.allCases) { r in
                         Text(r.displayName).tag(r)
                     }
                 }
-                Button("Wipe all recorded audio now") {
+                Button(L10n.wipeAllAudio) {
                     AudioRetentionSweeper.wipeAll()
                 }
             }
 
-            Section("Privacy notes") {
+            Section(L10n.privacyNotes) {
                 VStack(alignment: .leading, spacing: 6) {
                     Label {
-                        Text("Cloud providers (OpenAI, OpenRouter, Groq) receive your audio. Pick Local whisper.cpp in Providers for fully offline transcription.")
+                        Text(L10n.privacyCloud)
                     } icon: {
                         Image(systemName: "cloud.fill")
                             .foregroundColor(.secondary)
                     }
                     Label {
-                        Text("Clipboard managers (Paste, Raycast, Alfred) will capture the transcript when it reaches the pasteboard. Disable auto-paste in Recording if that concerns you.")
+                        Text(L10n.privacyClipboard)
                     } icon: {
                         Image(systemName: "doc.on.clipboard")
                             .foregroundColor(.secondary)
                     }
                     Label {
-                        Text("Raw WAVs live in ~/Library/Caches/WhisperHot/recordings/. API keys and the history encryption key are in the macOS Keychain with iCloud sync disabled.")
+                        Text(L10n.privacyFiles)
                     } icon: {
                         Image(systemName: "folder")
                             .foregroundColor(.secondary)
@@ -686,27 +695,27 @@ struct SettingsView: View {
         status: Binding<StatusMessage>,
         placeholder: String
     ) -> some View {
-        SecureField("API Key", text: binding, prompt: Text(placeholder))
+        SecureField(L10n.apiKey, text: binding, prompt: Text(placeholder))
             .textFieldStyle(.roundedBorder)
         HStack(spacing: 8) {
-            Button("Save") {
+            Button(L10n.save) {
                 let trimmed = binding.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else {
-                    status.wrappedValue = StatusMessage(text: "Key is empty.", kind: .error)
+                    status.wrappedValue = StatusMessage(text: L10n.keyIsEmpty, kind: .error)
                     return
                 }
                 do {
                     try Keychain.save(apiKey: trimmed, account: account)
-                    status.wrappedValue = StatusMessage(text: "Saved to Keychain.", kind: .success)
+                    status.wrappedValue = StatusMessage(text: L10n.savedToKeychain, kind: .success)
                 } catch {
                     status.wrappedValue = StatusMessage(text: "Save failed: \(error.localizedDescription)", kind: .error)
                 }
             }
-            Button("Delete") {
+            Button(L10n.delete) {
                 do {
                     try Keychain.delete(account: account)
                     binding.wrappedValue = ""
-                    status.wrappedValue = StatusMessage(text: "Deleted from Keychain.", kind: .success)
+                    status.wrappedValue = StatusMessage(text: L10n.deletedFromKeychain, kind: .success)
                 } catch {
                     status.wrappedValue = StatusMessage(text: "Delete failed: \(error.localizedDescription)", kind: .error)
                 }
@@ -720,20 +729,7 @@ struct SettingsView: View {
 
     // MARK: - Helpers
 
-    private var providerDescription: String {
-        switch provider {
-        case .openai:
-            return "Dedicated STT endpoint. Most accurate, most expensive."
-        case .openRouter:
-            return "Routes audio to chat models like GPT-4o Audio Preview via /chat/completions. One key, many models."
-        case .groq:
-            return "OpenAI-compatible STT mirror. Whisper large-v3-turbo is roughly 10× faster and much cheaper than OpenAI direct."
-        case .polzaAI:
-            return "Российский LLM-агрегатор. OpenAI-совместимый API, оплата российскими картами, 400+ моделей."
-        case .localWhisper:
-            return "Runs whisper.cpp on your Mac via subprocess. Fully offline, no API key, no network."
-        }
-    }
+    // providerDescription replaced by L10n.providerDescription(for:)
 
     private func pathDisplay(_ path: String) -> String {
         path.isEmpty ? "not set" : path
@@ -774,9 +770,9 @@ struct SettingsView: View {
     private func loadKey(account: Keychain.Account) -> (String, StatusMessage) {
         do {
             let key = try Keychain.readAPIKey(account: account)
-            return (key, StatusMessage(text: "Loaded from Keychain.", kind: .secondary))
+            return (key, StatusMessage(text: L10n.loadedFromKeychain, kind: .secondary))
         } catch Keychain.KeychainError.itemNotFound {
-            return ("", StatusMessage(text: "No key saved yet.", kind: .secondary))
+            return ("", StatusMessage(text: L10n.noKeySaved, kind: .secondary))
         } catch {
             return ("", StatusMessage(text: "Load failed: \(error.localizedDescription)", kind: .error))
         }

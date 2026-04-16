@@ -34,6 +34,7 @@ enum Preferences {
         static let postProcessingModelGroq = "WhisperHot.postProcessingModelGroq"
         static let customEndpointURL = "WhisperHot.customEndpointURL"
         static let customEndpointModel = "WhisperHot.customEndpointModel"
+        static let appLanguage = "WhisperHot.appLanguage"
     }
 
     enum Defaults {
