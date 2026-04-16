@@ -2,6 +2,32 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.6.2] — 2026-04-16
+
+Security fixes, рефакторинг, library split для тестируемости.
+
+### Для пользователей
+
+- **Приватность:** транскрипты больше не логируются в Console.app.
+  Раньше полный текст попадал в системные логи через NSLog.
+- **Безопасность:** custom endpoint теперь требует https:// (http
+  запрещён, транскрипты не уйдут по открытому каналу).
+- **Ошибки видны:** ошибки записи и транскрипции теперь показываются
+  баннером в статус-меню. Раньше приложение молча возвращалось в idle.
+
+### Для разработчиков
+
+- `TranscriptionCoordinator.swift` — выделен из MenuBarController.
+  Инкапсулирует: выбор провайдера, fallback, context routing, word
+  replacements, пост-обработку. MenuBarController: 984→828 строк.
+- Library target split: `WhisperHotLib` (.target) + `WhisperHot`
+  (.executableTarget) + `WhisperHotTests` (.testTarget). Тесты
+  используют `@testable import WhisperHotLib` с реальным production
+  кодом (ContextRule, WordReplacement, PostProcessingPreset).
+- `AudioRecorder.onRecordingError` callback для поверхностных ошибок.
+- WhisperInstaller: stdout handler дренит данные, cancel резюмирует
+  continuation.
+
 ## [0.6.1] — 2026-04-16
 
 Технический словарь, замены слов, фиксы UI.
