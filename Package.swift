@@ -8,6 +8,10 @@ let package = Package(
         .executableTarget(
             name: "WhisperHot",
             path: "Sources/WhisperHot"
+        ),
+        .testTarget(
+            name: "WhisperHotTests",
+            path: "Tests/WhisperHotTests"
         )
     ]
 )
