@@ -817,14 +817,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             }
             playChimeIfEnabled(.done)
 
-            // Non-modal signal: post-processing failure shows up as a
-            // sticky banner at the top of the status menu. Never steals
-            // focus from the app the user just pasted into.
-            switch result.postProcessing {
-            case .failed(let reason):
-                setPostProcessingError(reason)
-            case .succeeded, .none:
-                setPostProcessingError(nil)
+            // Non-modal signal: post-processing failure or offline fallback
+            // shows up as a sticky banner at the top of the status menu.
+            if result.usedOfflineFallback {
+                setPostProcessingError(L10n.lang == .ru
+                    ? "⚡ Использована локальная транскрипция (нет интернета)"
+                    : "⚡ Used local transcription (offline)",
+                    raw: true)
+            } else {
+                switch result.postProcessing {
+                case .failed(let reason):
+                    setPostProcessingError(reason)
+                case .succeeded, .none:
+                    setPostProcessingError(nil)
+                }
             }
 
             // Persist to encrypted history if the user opted in.
@@ -862,10 +868,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         AudioRetentionSweeper.activeRecordingURL = nil
     }
 
-    private func setPostProcessingError(_ error: String?) {
+    private func setPostProcessingError(_ error: String?, raw: Bool = false) {
         if let error {
             let truncated = error.count > 80 ? String(error.prefix(80)) + "…" : error
-            postProcessingErrorMenuItem?.title = "⚠ Post-processing: \(truncated)"
+            postProcessingErrorMenuItem?.title = raw ? truncated : "⚠ Post-processing: \(truncated)"
             postProcessingErrorMenuItem?.toolTip = error
             postProcessingErrorMenuItem?.isHidden = false
             postProcessingErrorSeparator?.isHidden = false

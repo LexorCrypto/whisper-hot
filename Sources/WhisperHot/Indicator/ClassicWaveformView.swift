@@ -8,7 +8,7 @@ struct ClassicWaveformView: View {
     var body: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(Color.red)
+                .fill(viewModel.mode == .transcribing ? Color.orange : Color.red)
                 .frame(width: 10, height: 10)
 
             Canvas { context, size in
@@ -40,24 +40,39 @@ struct ClassicWaveformView: View {
         let maxBarHeight = size.height
         let midY = size.height / 2
 
-        // `viewModel.rms` is a 0…~0.3 ballpark for speech. Scale up and clamp.
-        let level = CGFloat(min(max(viewModel.rms * 5.0, 0), 1))
+        let isTranscribing = viewModel.mode == .transcribing
+        let phaseBase = viewModel.elapsed * (isTranscribing ? 2.0 : 3.5)
 
-        // Animated phase over time so the bars "travel" during steady tone.
-        let phaseBase = viewModel.elapsed * 3.5
-
-        for i in 0..<barCount {
-            let phase = phaseBase + Double(i) * 0.35
-            let wave = (sin(phase) * 0.5 + 0.5)   // 0…1
-            let heightFrac = max(level * wave, 0.08)
-            let h = heightFrac * maxBarHeight
-            let x = CGFloat(i) * (barWidth + barSpacing)
-            let y = midY - h / 2
-            let rect = CGRect(x: x, y: y, width: barWidth, height: h)
-            context.fill(
-                Path(roundedRect: rect, cornerRadius: barWidth / 2),
-                with: .color(.accentColor)
-            )
+        if isTranscribing {
+            // Gentle breathing wave, no RMS
+            for i in 0..<barCount {
+                let t = Double(i) / Double(barCount)
+                let wave = sin(phaseBase + t * .pi * 3) * 0.5 + 0.5
+                let breathe = 0.3 + 0.7 * (sin(viewModel.elapsed * 0.8) * 0.5 + 0.5)
+                let h = max(wave * breathe * maxBarHeight * 0.4, 2)
+                let x = CGFloat(i) * (barWidth + barSpacing)
+                let y = midY - h / 2
+                let rect = CGRect(x: x, y: y, width: barWidth, height: h)
+                context.fill(
+                    Path(roundedRect: rect, cornerRadius: barWidth / 2),
+                    with: .color(.orange.opacity(0.2 + 0.5 * wave * breathe))
+                )
+            }
+        } else {
+            let level = CGFloat(min(max(viewModel.rms * 5.0, 0), 1))
+            for i in 0..<barCount {
+                let phase = phaseBase + Double(i) * 0.35
+                let wave = (sin(phase) * 0.5 + 0.5)
+                let heightFrac = max(level * wave, 0.08)
+                let h = heightFrac * maxBarHeight
+                let x = CGFloat(i) * (barWidth + barSpacing)
+                let y = midY - h / 2
+                let rect = CGRect(x: x, y: y, width: barWidth, height: h)
+                context.fill(
+                    Path(roundedRect: rect, cornerRadius: barWidth / 2),
+                    with: .color(.accentColor)
+                )
+            }
         }
     }
 

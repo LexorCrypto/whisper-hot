@@ -6,7 +6,7 @@ struct MiniPillView: View {
     var body: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(Color.red)
+                .fill(viewModel.mode == .transcribing ? Color.orange : Color.red)
                 .frame(width: 9, height: 9)
                 .opacity(pulseOpacity)
             Text(formattedElapsed)
@@ -27,8 +27,11 @@ struct MiniPillView: View {
     }
 
     private var pulseOpacity: Double {
-        // Smooth 1 Hz pulse. Slightly boosted when the RMS spikes so the
-        // dot "breathes" with the user's voice.
+        if viewModel.mode == .transcribing {
+            // Slower, calmer pulse for waiting state
+            let phase = viewModel.elapsed.truncatingRemainder(dividingBy: 1.5)
+            return 0.4 + 0.6 * (0.5 + 0.5 * cos(phase / 1.5 * .pi * 2))
+        }
         let phase = viewModel.elapsed.truncatingRemainder(dividingBy: 1.0)
         let base = 0.55 + 0.45 * cos(phase * .pi * 2)
         let rmsBoost = Double(min(viewModel.rms * 4, 1))
