@@ -38,17 +38,10 @@ struct FloatingCapsuleView: View {
                 }
             }
 
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(formattedElapsed)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundColor(.primary)
-                if viewModel.mode == .transcribing {
-                    Text(L10n.lang == .ru ? "обработка" : "processing")
-                        .font(.system(size: 9, weight: .regular))
-                        .foregroundColor(.orange)
-                }
-            }
-            .frame(width: 64, alignment: .trailing)
+            Text(formattedElapsed)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundColor(.primary)
+                .frame(width: 44, alignment: .trailing)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
