@@ -95,12 +95,12 @@ final class WhisperInstaller: ObservableObject {
         if findWhisperBinary() == nil {
             guard let brewPath = findBrew() else {
                 status = .failed(message: L10n.lang == .ru
-                    ? "Homebrew не найден. Установите: /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-                    : "Homebrew not found. Install: /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"")
+                    ? "Homebrew не найден. Установите (2-5 мин): /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+                    : "Homebrew not found. Install (2-5 min): /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"")
                 return
             }
 
-            status = .installing(step: L10n.lang == .ru ? "Установка whisper-cpp через Homebrew..." : "Installing whisper-cpp via Homebrew...")
+            status = .installing(step: L10n.lang == .ru ? "Установка whisper-cpp через Homebrew (2-5 мин)..." : "Installing whisper-cpp via Homebrew (2-5 min)...")
 
             let success = await runBrew(brewPath: brewPath)
             if !success {

@@ -402,8 +402,8 @@ struct SettingsView: View {
             }
 
             Text(L10n.lang == .ru
-                ? "Нажмите «Установить» для автоматической установки whisper-cpp через Homebrew и загрузки модели ggml-base (~142 МБ). Или настройте пути вручную."
-                : "Click Install to automatically set up whisper-cpp via Homebrew and download the ggml-base model (~142 MB). Or configure paths manually.")
+                ? "Нажмите «Установить» для автоматической установки whisper-cpp через Homebrew и загрузки модели ggml-base (~142 МБ). Установка занимает 2-5 минут. Или настройте пути вручную."
+                : "Click Install to automatically set up whisper-cpp via Homebrew and download the ggml-base model (~142 MB). Installation takes 2-5 minutes. Or configure paths manually.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
