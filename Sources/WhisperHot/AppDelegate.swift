@@ -1,9 +1,10 @@
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+public final class AppDelegate: NSObject, NSApplicationDelegate {
+    public override init() { super.init() }
     private var menuBarController: MenuBarController?
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    public func applicationDidFinishLaunching(_ notification: Notification) {
         // Retention housekeeping before any recording work starts.
         if Preferences.audioRetention == .untilQuit {
             // .untilQuit means "only keep for the current session". If the
@@ -20,11 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarController = MenuBarController()
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
+    public func applicationWillTerminate(_ notification: Notification) {
         // Honor the `.untilQuit` retention policy — wipe every audio file
         // on app quit when the user opted into that setting, INCLUDING
         // any file the sweeper would normally protect as an in-flight

@@ -4,7 +4,7 @@ import Foundation
 /// Central namespace for every user-facing preference backed by UserDefaults.
 /// SwiftUI code binds via `@AppStorage(Preferences.Key.X)`; non-SwiftUI code
 /// reads via the typed accessors below.
-enum Preferences {
+public enum Preferences {
     enum Key {
         static let provider = "WhisperHot.provider"
         static let modelOpenAI = "WhisperHot.modelOpenAI"
@@ -74,7 +74,7 @@ enum Preferences {
 
     /// Register baseline defaults so first-run reads return sensible values
     /// instead of false/empty. Call exactly once at launch.
-    static func registerDefaults() {
+    public static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
             Key.provider: Defaults.provider,
             Key.modelOpenAI: Defaults.modelOpenAI,

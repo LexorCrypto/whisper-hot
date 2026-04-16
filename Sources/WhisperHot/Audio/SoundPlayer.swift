@@ -72,13 +72,11 @@ final class SoundPlayer {
     }
 
     private func customSoundURL(for chime: Chime) -> URL? {
-        // In the app bundle: Contents/Resources/Sounds/start.aiff
-        let bundle = Bundle.main
-        if let url = bundle.url(forResource: chime.customFileName, withExtension: "aiff", subdirectory: "Sounds") {
+        // Fallback: app bundle (Contents/Resources/Sounds/ via build.sh)
+        if let url = Bundle.main.url(forResource: chime.customFileName, withExtension: "aiff", subdirectory: "Sounds") {
             return url
         }
-        // Also check without subdirectory (flat Resources/)
-        if let url = bundle.url(forResource: chime.customFileName, withExtension: "aiff") {
+        if let url = Bundle.main.url(forResource: chime.customFileName, withExtension: "aiff") {
             return url
         }
         return nil

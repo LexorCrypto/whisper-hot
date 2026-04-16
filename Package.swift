@@ -5,13 +5,19 @@ let package = Package(
     name: "WhisperHot",
     platforms: [.macOS(.v13)],
     targets: [
+        .target(
+            name: "WhisperHotLib",
+            path: "Sources/WhisperHot",
+            exclude: ["WhisperHotApp.swift"]
+        ),
         .executableTarget(
             name: "WhisperHot",
-            path: "Sources/WhisperHot",
-            resources: [.copy("../../Resources/Sounds")]
+            dependencies: ["WhisperHotLib"],
+            path: "Sources/WhisperHotApp"
         ),
         .testTarget(
             name: "WhisperHotTests",
+            dependencies: ["WhisperHotLib"],
             path: "Tests/WhisperHotTests"
         )
     ]
