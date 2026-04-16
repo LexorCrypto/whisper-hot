@@ -1,7 +1,7 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 35 Swift файлов, ~5800 строк. AppKit — основная оболочка,
+приложение. 39 Swift файлов, ~7000 строк. AppKit — основная оболочка,
 SwiftUI живёт внутри Settings, Onboarding, History и recording
 indicator через `NSHostingView`.
 
@@ -50,6 +50,7 @@ Sources/WhisperHot/
 │
 ├── Transcription/
 │   ├── TranscriptionService.swift  Протокол + TranscriptionOptions + result
+│   ├── FallbackTranscriptionService.swift  Offline fallback wrapper
 │   ├── TranscriptionError.swift
 │   └── Providers/
 │       ├── OpenAICompatibleSTTProvider.swift  OpenAI + Groq
@@ -79,6 +80,10 @@ Sources/WhisperHot/
 │   ├── MiniPillView.swift          Capsule с pulse dot
 │   ├── ClassicWaveformView.swift   Canvas bar renderer
 │   └── FloatingCapsuleView.swift   Premium: blur material + TimelineView waveform
+│
+├── LocalSetup/
+│   ├── WhisperInstaller.swift    One-click brew install + model download
+│   └── UpdateChecker.swift       GitHub Releases API, semver compare
 │
 ├── Localization/
 │   └── L10n.swift                Русский/английский UI, переключатель в Settings

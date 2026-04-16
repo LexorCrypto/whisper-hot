@@ -2,6 +2,37 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.5.0] — 2026-04-16
+
+One-click установка whisper.cpp, авто-переключение на офлайн,
+проверка обновлений, иконка приложения, Apache License 2.0.
+
+### Для пользователей
+
+- **Установка whisper.cpp одной кнопкой.** В секции Local whisper.cpp
+  кнопка "Установить" запускает `brew install whisper-cpp` и скачивает
+  модель ggml-base (~142 МБ) с HuggingFace. Прогресс отображается в
+  реальном времени. Ручная настройка путей спрятана в DisclosureGroup.
+- **Авто-переключение на офлайн.** Если облачный провайдер недоступен
+  (нет интернета), WhisperHot автоматически использует локальный
+  whisper.cpp, если он установлен. Пост-обработка тоже пропускается.
+- **Проверка обновлений.** Новая секция "Обновления" в Settings.
+  Кнопка "Проверить обновления" сверяет версию с GitHub Releases,
+  предлагает скачать DMG если есть новая.
+- **Иконка приложения.** Микрофон с звуковыми волнами на тёмном
+  градиенте. Видна в Dock (при открытии Settings), Finder и About.
+- **Apache License 2.0.** Лицензия изменена с MIT на Apache 2.0.
+
+### Для разработчиков
+
+- `LocalSetup/WhisperInstaller.swift` — brew install + HuggingFace
+  model download с async pipe draining и progress delegate.
+- `Transcription/FallbackTranscriptionService.swift` — wrapper для
+  offline fallback (URLError.notConnectedToInternet/networkConnectionLost).
+- `LocalSetup/UpdateChecker.swift` — GitHub Releases API с semver
+  comparison и 1-hour cache.
+- `Resources/WhisperHot.icns` — app icon (1024px, iconutil).
+
 ## [0.4.0] — 2026-04-16
 
 Полная замена SuperWhisper: контекстный роутинг, мульти-провайдер
