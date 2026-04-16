@@ -553,6 +553,26 @@ struct SettingsView: View {
             Text("Любая chat-модель из каталога Polza.ai. Использует ключ Polza.ai из таба Providers.")
                 .font(.caption)
                 .foregroundColor(.secondary)
+        case .localLLM:
+            TextField(L10n.lang == .ru ? "Путь к llama-cli" : "llama-cli path",
+                      text: Binding(
+                        get: { UserDefaults.standard.string(forKey: Preferences.Key.localLLMBinaryPath) ?? "" },
+                        set: { UserDefaults.standard.set($0, forKey: Preferences.Key.localLLMBinaryPath) }
+                      ),
+                      prompt: Text("/opt/homebrew/bin/llama-cli"))
+                .textFieldStyle(.roundedBorder)
+            TextField(L10n.lang == .ru ? "Путь к GGUF модели" : "GGUF model path",
+                      text: Binding(
+                        get: { UserDefaults.standard.string(forKey: Preferences.Key.localLLMModelPath) ?? "" },
+                        set: { UserDefaults.standard.set($0, forKey: Preferences.Key.localLLMModelPath) }
+                      ),
+                      prompt: Text("~/models/llama-3.1-8b-q4.gguf"))
+                .textFieldStyle(.roundedBorder)
+            Text(L10n.lang == .ru
+                ? "Полностью офлайн обработка. Установите llama.cpp: brew install llama.cpp. Скачайте GGUF модель с huggingface.co."
+                : "Fully offline processing. Install: brew install llama.cpp. Download a GGUF model from huggingface.co.")
+                .font(.caption)
+                .foregroundColor(.secondary)
         case .custom:
             TextField("Endpoint URL", text: $customEndpointURL, prompt: Text("https://api.polza.ai/v1/chat/completions"))
                 .textFieldStyle(.roundedBorder)

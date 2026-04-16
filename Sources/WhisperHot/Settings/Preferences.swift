@@ -34,6 +34,8 @@ enum Preferences {
         static let postProcessingModelGroq = "WhisperHot.postProcessingModelGroq"
         static let customEndpointURL = "WhisperHot.customEndpointURL"
         static let customEndpointModel = "WhisperHot.customEndpointModel"
+        static let localLLMBinaryPath = "WhisperHot.localLLMBinaryPath"
+        static let localLLMModelPath = "WhisperHot.localLLMModelPath"
         static let appLanguage = "WhisperHot.appLanguage"
     }
 
@@ -233,6 +235,14 @@ enum Preferences {
         UserDefaults.standard.string(forKey: Key.postProcessingModelGroq) ?? Defaults.postProcessingModelGroq
     }
 
+    static var localLLMBinaryPath: String {
+        UserDefaults.standard.string(forKey: Key.localLLMBinaryPath) ?? ""
+    }
+
+    static var localLLMModelPath: String {
+        UserDefaults.standard.string(forKey: Key.localLLMModelPath) ?? ""
+    }
+
     static var customEndpointURL: String {
         UserDefaults.standard.string(forKey: Key.customEndpointURL) ?? Defaults.customEndpointURL
     }
@@ -248,6 +258,7 @@ enum Preferences {
         case .openAI: return postProcessingModelOpenAI
         case .groq: return postProcessingModelGroq
         case .polzaAI: return postProcessingModel        // same OpenAI-compatible namespace
+        case .localLLM: return ""                        // model path from localLLMModelPath
         case .custom: return customEndpointModel
         }
     }
@@ -410,6 +421,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
     case openAI = "openai"
     case groq = "groq"
     case polzaAI = "polzaai"
+    case localLLM = "localllm"
     case custom = "custom"
 
     var id: String { rawValue }
@@ -420,16 +432,18 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
         case .openAI: return "OpenAI"
         case .groq: return "Groq"
         case .polzaAI: return "Polza.ai"
+        case .localLLM: return "Local LLM (llama.cpp)"
         case .custom: return "Custom endpoint"
         }
     }
 
-    var keychainAccount: Keychain.Account {
+    var keychainAccount: Keychain.Account? {
         switch self {
         case .openRouter: return .openRouter
         case .openAI: return .openAI
         case .groq: return .groq
         case .polzaAI: return .polzaAI
+        case .localLLM: return nil  // no API key needed
         case .custom: return .customEndpoint
         }
     }
@@ -442,6 +456,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
         case .openAI: return URL(string: "https://api.openai.com/v1/chat/completions")!
         case .groq: return URL(string: "https://api.groq.com/openai/v1/chat/completions")!
         case .polzaAI: return URL(string: "https://polza.ai/api/v1/chat/completions")!
+        case .localLLM: return nil  // subprocess, no HTTP endpoint
         case .custom:
             let raw = Preferences.customEndpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !raw.isEmpty, let url = URL(string: raw), url.scheme == "https" || url.scheme == "http" else {
@@ -458,7 +473,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
                 "HTTP-Referer": "https://github.com/LexorCrypto/whisper-hot",
                 "X-Title": "WhisperHot"
             ]
-        case .openAI, .groq, .polzaAI, .custom:
+        case .openAI, .groq, .polzaAI, .localLLM, .custom:
             return [:]
         }
     }

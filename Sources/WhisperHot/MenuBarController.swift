@@ -686,19 +686,32 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // disabled the snapshot is nil and the task skips the extra hop.
         let ppProvider = Preferences.ppProvider
         let postProcessor: LLMPostProcessor?
+        let localLLMProcessor: LocalLLMProcessor?
         if skipPostProcessing {
             postProcessor = nil
-        } else if let endpoint = ppProvider.endpoint {
+            localLLMProcessor = nil
+        } else if ppProvider == .localLLM {
+            // Local LLM: use subprocess instead of HTTP
+            postProcessor = nil
+            let bin = Preferences.localLLMBinaryPath
+            let model = Preferences.localLLMModelPath
+            if !bin.isEmpty && !model.isEmpty {
+                localLLMProcessor = LocalLLMProcessor(binaryPath: bin, modelPath: model)
+            } else {
+                NSLog("WhisperHot: local LLM paths not configured, skipping post-processing")
+                localLLMProcessor = nil
+            }
+        } else if let endpoint = ppProvider.endpoint, let account = ppProvider.keychainAccount {
             postProcessor = LLMPostProcessor(
                 endpoint: endpoint,
-                apiKeyProvider: { try Keychain.readAPIKey(account: ppProvider.keychainAccount) },
+                apiKeyProvider: { try Keychain.readAPIKey(account: account) },
                 extraHeaders: ppProvider.extraHeaders
             )
+            localLLMProcessor = nil
         } else {
-            // Custom endpoint URL is invalid/empty — skip post-processing
-            // rather than leaking credentials to a fallback URL.
-            NSLog("WhisperHot: post-processing skipped — custom endpoint URL is invalid")
+            NSLog("WhisperHot: post-processing skipped — endpoint or key not configured")
             postProcessor = nil
+            localLLMProcessor = nil
         }
 
         // When context routing is on, override the preset based on the app
@@ -728,6 +741,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 // Skip post-processing if offline fallback was used (LLM also needs network)
                 if raw.usedOfflineFallback {
                     NSLog("WhisperHot: offline fallback used, skipping post-processing")
+                } else if let localLLM = localLLMProcessor, let ppOptions = postProcessingOptions {
+                    do {
+                        let processed = try await localLLM.process(text: raw.text, options: ppOptions)
+                        finalResult = TranscriptionResult(
+                            text: processed,
+                            providerModel: raw.providerModel,
+                            postProcessing: .succeeded(model: "local-llm", preset: ppOptions.preset.rawValue)
+                        )
+                    } catch {
+                        NSLog("WhisperHot: local LLM failed → \(error.localizedDescription)")
+                        finalResult = TranscriptionResult(
+                            text: raw.text,
+                            providerModel: raw.providerModel,
+                            postProcessing: .failed(reason: error.localizedDescription)
+                        )
+                    }
                 } else if let postProcessor, let ppOptions = postProcessingOptions {
                     do {
                         let processed = try await postProcessor.process(
