@@ -572,6 +572,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// Returns a local whisper provider if binary and model are both
+    /// configured and exist on disk. Used as offline fallback.
+    private func makeLocalFallbackIfReady() -> TranscriptionService? {
+        let bin = Preferences.localWhisperBinaryPath
+        let model = Preferences.localWhisperModelPath
+        guard !bin.isEmpty, !model.isEmpty,
+              FileManager.default.isExecutableFile(atPath: bin),
+              FileManager.default.fileExists(atPath: model) else {
+            return nil
+        }
+        return LocalWhisperProvider(binaryPath: bin, modelPath: model)
+    }
+
     private func captureRecordingTarget() {
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
@@ -623,7 +636,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         state = .transcribing
         recordMenuItem?.title = "Transcribing…"
 
-        let service = makeTranscriptionService(for: Preferences.provider)
+        let primaryService = makeTranscriptionService(for: Preferences.provider)
+        // Wrap with offline fallback if local whisper is available
+        let localFallback: TranscriptionService? = makeLocalFallbackIfReady()
+        let service: TranscriptionService = FallbackTranscriptionService(
+            primary: primaryService,
+            fallback: localFallback
+        )
         var options = TranscriptionOptions()
         options.model = Preferences.currentModel
         options.language = Preferences.language
@@ -675,7 +694,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
                 var finalResult = raw
 
-                if let postProcessor, let ppOptions = postProcessingOptions {
+                // Skip post-processing if offline fallback was used (LLM also needs network)
+                if raw.usedOfflineFallback {
+                    NSLog("WhisperHot: offline fallback used, skipping post-processing")
+                } else if let postProcessor, let ppOptions = postProcessingOptions {
                     do {
                         let processed = try await postProcessor.process(
                             text: raw.text,

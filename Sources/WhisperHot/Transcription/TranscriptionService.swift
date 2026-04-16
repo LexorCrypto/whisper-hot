@@ -37,11 +37,16 @@ struct TranscriptionResult: Equatable, Sendable {
     /// downstream code (and Block 13 history) can distinguish three states
     /// cleanly instead of string-concatenating everything into providerModel.
     var postProcessing: PostProcessingOutcome?
+    /// True when FallbackTranscriptionService used local whisper because
+    /// the cloud provider was offline. Signals to MenuBarController:
+    /// skip post-processing (LLM also needs network) and show a banner.
+    var usedOfflineFallback: Bool
 
-    init(text: String, providerModel: String, postProcessing: PostProcessingOutcome? = nil) {
+    init(text: String, providerModel: String, postProcessing: PostProcessingOutcome? = nil, usedOfflineFallback: Bool = false) {
         self.text = text
         self.providerModel = providerModel
         self.postProcessing = postProcessing
+        self.usedOfflineFallback = usedOfflineFallback
     }
 }
 
