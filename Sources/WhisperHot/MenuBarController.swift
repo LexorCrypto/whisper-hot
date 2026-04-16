@@ -87,6 +87,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 self?.handleAutoStop()
             }
         }
+        audioRecorder.onRecordingError = { [weak self] message in
+            MainActor.assumeIsolated {
+                self?.setPostProcessingError(
+                    L10n.lang == .ru
+                        ? "⚠ Ошибка записи: \(message)"
+                        : "⚠ Recording error: \(message)",
+                    raw: true
+                )
+            }
+        }
         hotkeyManager.onHotkey = { [weak self] in
             MainActor.assumeIsolated {
                 self?.toggleRecording(nil, wantsRawOutput: false)
@@ -568,51 +578,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    private func makeTranscriptionService(for provider: TranscriptionProvider) -> TranscriptionService {
-        switch provider {
-        case .openai:
-            return OpenAICompatibleSTTProvider(
-                endpoint: URL(string: "https://api.openai.com/v1/audio/transcriptions")!,
-                model: Preferences.modelOpenAI,
-                apiKeyProvider: { try Keychain.readAPIKey(account: .openAI) }
-            )
-        case .openRouter:
-            return OpenRouterAudioProvider(
-                model: Preferences.modelOpenRouter,
-                apiKeyProvider: { try Keychain.readAPIKey(account: .openRouter) }
-            )
-        case .groq:
-            return OpenAICompatibleSTTProvider(
-                endpoint: URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!,
-                model: Preferences.modelGroq,
-                apiKeyProvider: { try Keychain.readAPIKey(account: .groq) }
-            )
-        case .polzaAI:
-            return OpenAICompatibleSTTProvider(
-                endpoint: URL(string: "https://polza.ai/api/v1/audio/transcriptions")!,
-                model: Preferences.modelOpenAI,
-                apiKeyProvider: { try Keychain.readAPIKey(account: .polzaAI) }
-            )
-        case .localWhisper:
-            return LocalWhisperProvider(
-                binaryPath: Preferences.localWhisperBinaryPath,
-                modelPath: Preferences.localWhisperModelPath
-            )
-        }
-    }
-
-    /// Returns a local whisper provider if binary and model are both
-    /// configured and exist on disk. Used as offline fallback.
-    private func makeLocalFallbackIfReady() -> TranscriptionService? {
-        let bin = Preferences.localWhisperBinaryPath
-        let model = Preferences.localWhisperModelPath
-        guard !bin.isEmpty, !model.isEmpty,
-              FileManager.default.isExecutableFile(atPath: bin),
-              FileManager.default.fileExists(atPath: model) else {
-            return nil
-        }
-        return LocalWhisperProvider(binaryPath: bin, modelPath: model)
-    }
+    // Provider factories moved to TranscriptionCoordinator.swift
 
     private func captureRecordingTarget() {
         let front = NSWorkspace.shared.frontmostApplication
@@ -667,142 +633,30 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         state = .transcribing
         recordMenuItem?.title = L10n.transcribing
 
-        let primaryService = makeTranscriptionService(for: Preferences.provider)
-        // Wrap with offline fallback if local whisper is available
-        let localFallback: TranscriptionService? = makeLocalFallbackIfReady()
-        let service: TranscriptionService = FallbackTranscriptionService(
-            primary: primaryService,
-            fallback: localFallback
+        // Snapshot all preferences on the main actor, then hand off to
+        // TranscriptionCoordinator which runs the full pipeline off-main.
+        let coordinator = TranscriptionCoordinator.fromPreferences(
+            provider: Preferences.provider,
+            recordingTarget: recordingTarget,
+            wantsRawOutput: wantsRawOutput
         )
+
         var options = TranscriptionOptions()
         options.model = Preferences.currentModel
         options.language = Preferences.language
-        // Pass vocabulary hints as prompt bias for better tech term recognition
         let hints = Preferences.vocabularyHints.trimmingCharacters(in: .whitespacesAndNewlines)
         if !hints.isEmpty {
             options.prompt = hints
         }
-        // Snapshot word replacements for post-transcription fixup
-        let wordReplacements = Preferences.wordReplacements
 
-        // If the user requested raw output (⌥⌘⇧5), skip post-processing entirely.
-        let skipPostProcessing = wantsRawOutput || !Preferences.postProcessingEnabled
-
-        // Snapshot post-processing configuration on the main actor before
-        // handing it off to the detached task. If post-processing is
-        // disabled the snapshot is nil and the task skips the extra hop.
-        let ppProvider = Preferences.ppProvider
-        let postProcessor: LLMPostProcessor?
-        let localLLMProcessor: LocalLLMProcessor?
-        if skipPostProcessing {
-            postProcessor = nil
-            localLLMProcessor = nil
-        } else if ppProvider == .localLLM {
-            // Local LLM: use subprocess instead of HTTP
-            postProcessor = nil
-            let bin = Preferences.localLLMBinaryPath
-            let model = Preferences.localLLMModelPath
-            if !bin.isEmpty && !model.isEmpty {
-                localLLMProcessor = LocalLLMProcessor(binaryPath: bin, modelPath: model)
-            } else {
-                NSLog("WhisperHot: local LLM paths not configured, skipping post-processing")
-                localLLMProcessor = nil
-            }
-        } else if let endpoint = ppProvider.endpoint, let account = ppProvider.keychainAccount {
-            postProcessor = LLMPostProcessor(
-                endpoint: endpoint,
-                apiKeyProvider: { try Keychain.readAPIKey(account: account) },
-                extraHeaders: ppProvider.extraHeaders
-            )
-            localLLMProcessor = nil
-        } else {
-            NSLog("WhisperHot: post-processing skipped — endpoint or key not configured")
-            postProcessor = nil
-            localLLMProcessor = nil
-        }
-
-        // When context routing is on, override the preset based on the app
-        // that was frontmost when recording started (recordingTarget).
-        var ppOptions = Preferences.currentPostProcessingOptions
-        if !skipPostProcessing && Preferences.contextRoutingEnabled {
-            let resolved = ContextRouter.resolve(
-                target: recordingTarget,
-                rules: Preferences.contextRules
-            )
-            ppOptions.preset = resolved
-            NSLog("WhisperHot: context route → \(recordingTarget?.bundleIdentifier ?? "nil") → \(resolved.rawValue)")
-        }
-        let postProcessingOptions: PostProcessingOptions? = skipPostProcessing ? nil : ppOptions
-
-        // Run the transcription off the main actor so disk I/O (Data(contentsOf:))
-        // and multipart body construction don't block the UI thread. The
-        // optional post-processing step runs on the same detached task
-        // before the result is handed back to the main actor.
         Task.detached(priority: .userInitiated) { [weak self] in
             let outcome: TranscriptionOutcome
-            do {
-                let raw = try await service.transcribe(audioURL: audioURL, options: options)
-
-                // Apply word replacements before post-processing
-                let fixedText = wordReplacements.isEmpty
-                    ? raw.text
-                    : WordReplacement.applyAll(wordReplacements, to: raw.text)
-                var finalResult = TranscriptionResult(
-                    text: fixedText,
-                    providerModel: raw.providerModel,
-                    postProcessing: raw.postProcessing,
-                    usedOfflineFallback: raw.usedOfflineFallback
-                )
-
-                // Skip post-processing if offline fallback was used (LLM also needs network)
-                if raw.usedOfflineFallback {
-                    NSLog("WhisperHot: offline fallback used, skipping post-processing")
-                } else if let localLLM = localLLMProcessor, let ppOptions = postProcessingOptions {
-                    do {
-                        let processed = try await localLLM.process(text: fixedText, options: ppOptions)
-                        finalResult = TranscriptionResult(
-                            text: processed,
-                            providerModel: raw.providerModel,
-                            postProcessing: .succeeded(model: "local-llm", preset: ppOptions.preset.rawValue)
-                        )
-                    } catch {
-                        NSLog("WhisperHot: local LLM failed → \(error.localizedDescription)")
-                        finalResult = TranscriptionResult(
-                            text: fixedText,
-                            providerModel: raw.providerModel,
-                            postProcessing: .failed(reason: error.localizedDescription)
-                        )
-                    }
-                } else if let postProcessor, let ppOptions = postProcessingOptions {
-                    do {
-                        let processed = try await postProcessor.process(
-                            text: fixedText,
-                            options: ppOptions
-                        )
-                        finalResult = TranscriptionResult(
-                            text: processed,
-                            providerModel: raw.providerModel,
-                            postProcessing: .succeeded(
-                                model: ppOptions.model,
-                                preset: ppOptions.preset.rawValue
-                            )
-                        )
-                    } catch {
-                        // Soft-fail: log, keep the raw transcript, and mark the
-                        // failure in the outcome so finishTranscription can
-                        // surface it visibly to the user.
-                        NSLog("WhisperHot: post-processing failed → \(error.localizedDescription)")
-                        finalResult = TranscriptionResult(
-                            text: fixedText,
-                            providerModel: raw.providerModel,
-                            postProcessing: .failed(reason: error.localizedDescription)
-                        )
-                    }
-                }
-
-                outcome = .success(finalResult)
-            } catch {
-                outcome = .failure(error.localizedDescription)
+            let coordResult = await coordinator.run(audioURL: audioURL, options: options)
+            switch coordResult {
+            case .success(let result):
+                outcome = .success(result)
+            case .failure(let message):
+                outcome = .failure(message)
             }
             await self?.finishTranscription(outcome: outcome)
         }

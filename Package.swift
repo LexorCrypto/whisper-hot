@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "WhisperHot",
-            path: "Sources/WhisperHot"
+            path: "Sources/WhisperHot",
+            resources: [.copy("../../Resources/Sounds")]
         ),
         .testTarget(
             name: "WhisperHotTests",
