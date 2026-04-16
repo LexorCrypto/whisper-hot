@@ -2,6 +2,43 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.6.0] — 2026-04-16
+
+Intent Router, локальная LLM обработка, анимация ожидания для всех
+стилей индикатора, офлайн-баннер, unit тесты.
+
+### Для пользователей
+
+- **Intent Router.** Контекстный роутинг теперь читает заголовок окна
+  браузера через Accessibility API. Gmail в Chrome автоматически
+  получает стиль email, Slack в Safari — casual. Работает без
+  скриншотов, только bundle ID + window title.
+- **Локальная LLM обработка.** Новый провайдер "Local LLM (llama.cpp)"
+  в пост-обработке. Полностью офлайн: запускает llama-cli как
+  subprocess. Установите через `brew install llama.cpp` и скачайте
+  GGUF модель с HuggingFace.
+- **Анимация ожидания.** Все три стиля индикатора (pill, waveform,
+  floating capsule) теперь показывают оранжевую пульсирующую
+  анимацию во время транскрибации. Раньше индикатор пропадал сразу.
+- **Волна побольше.** Floating capsule: 36 баров (было 24), амплитуда
+  x8, двойные гармоники для более живого вида.
+- **Офлайн-баннер.** Когда WhisperHot использует локальный whisper
+  из-за отсутствия интернета, в меню появляется уведомление
+  "⚡ Использована локальная транскрипция".
+- **Local whisper всегда виден.** Секция Local whisper.cpp теперь
+  постоянно отображается внизу таба Providers с toggle.
+
+### Для разработчиков
+
+- `ContextRouter` читает window title через AXUIElement API (lazy query).
+- `ContextRule.titleContains` — опциональное поле для title matching.
+- `LocalLLMProcessor.swift` — llama-cli subprocess с stdin prompt,
+  DispatchGroup EOF tracking, tilde expansion.
+- `IndicatorViewModel.Mode` enum (idle/recording/transcribing).
+- Все три indicator views обрабатывают transcribing mode.
+- `FallbackTranscriptionService` banner через `setPostProcessingError(raw:)`.
+- `Tests/WhisperHotTests/ContextRouterTests.swift` — 15 test cases.
+
 ## [0.5.0] — 2026-04-16
 
 One-click установка whisper.cpp, авто-переключение на офлайн,

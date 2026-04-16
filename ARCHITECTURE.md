@@ -1,7 +1,7 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 39 Swift файлов, ~7000 строк. AppKit — основная оболочка,
+приложение. 40 Swift файлов, ~8000 строк. AppKit — основная оболочка,
 SwiftUI живёт внутри Settings, Onboarding, History и recording
 indicator через `NSHostingView`.
 
@@ -59,7 +59,8 @@ Sources/WhisperHot/
 │
 ├── PostProcessing/
 │   ├── PostProcessingPreset.swift  Cleanup, email, Slack, technical, ...
-│   └── LLMPostProcessor.swift      /chat/completions (OpenRouter/OpenAI/Groq/custom)
+│   ├── LLMPostProcessor.swift      /chat/completions (OpenRouter/OpenAI/Groq/custom)
+│   └── LocalLLMProcessor.swift    llama-cli subprocess (полностью офлайн)
 │
 ├── Paste/
 │   └── PasteService.swift        Pasteboard write + guarded CGEventPost
