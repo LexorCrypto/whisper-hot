@@ -80,9 +80,12 @@ mkdir -p "${APP_BUNDLE}/Contents/Resources"
 ditto --noextattr "${BIN_PATH}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 ditto --noextattr Resources/Info.plist "${APP_BUNDLE}/Contents/Info.plist"
 
-# TODO (Block 6+): when SwiftPM target gains resources (.caf sounds, etc.),
-# copy generated ${APP_NAME}_${APP_NAME}.bundle from ${BIN_DIR} into
-# ${APP_BUNDLE}/Contents/Resources/ so Bundle.module resolves at runtime.
+# Copy custom sounds into the app bundle if they exist.
+if [ -d "Resources/Sounds" ]; then
+    mkdir -p "${APP_BUNDLE}/Contents/Resources/Sounds"
+    ditto --noextattr Resources/Sounds/ "${APP_BUNDLE}/Contents/Resources/Sounds/"
+    echo "  copied custom sounds to bundle"
+fi
 
 echo "[4/5] Signing with stable identity"
 # Final defensive sweep in case anything slipped through.
