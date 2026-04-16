@@ -558,6 +558,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 model: Preferences.modelGroq,
                 apiKeyProvider: { try Keychain.readAPIKey(account: .groq) }
             )
+        case .polzaAI:
+            return OpenAICompatibleSTTProvider(
+                endpoint: URL(string: "https://polza.ai/api/v1/audio/transcriptions")!,
+                model: Preferences.modelOpenAI,
+                apiKeyProvider: { try Keychain.readAPIKey(account: .polzaAI) }
+            )
         case .localWhisper:
             return LocalWhisperProvider(
                 binaryPath: Preferences.localWhisperBinaryPath,

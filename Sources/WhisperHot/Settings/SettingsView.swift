@@ -52,6 +52,8 @@ struct SettingsView: View {
     @State private var openRouterStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var groqKey: String = ""
     @State private var groqStatus: StatusMessage = .init(text: "", kind: .secondary)
+    @State private var polzaAIKey: String = ""
+    @State private var polzaAIStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var customEndpointKey: String = ""
     @State private var customEndpointKeyStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var contextRules: [ContextRule] = Preferences.contextRules
@@ -262,6 +264,18 @@ struct SettingsView: View {
                     status: $groqStatus,
                     placeholder: "gsk_..."
                 )
+            case .polzaAI:
+                Section("Polza.ai API Key") {
+                    apiKeyControls(
+                        account: .polzaAI,
+                        binding: $polzaAIKey,
+                        status: $polzaAIStatus,
+                        placeholder: "plz_..."
+                    )
+                }
+                Section("Polza.ai Model") {
+                    modelPicker
+                }
             case .localWhisper:
                 localWhisperSection
             }
@@ -462,6 +476,12 @@ struct SettingsView: View {
             Text("Groq chat completions model. Uses your Groq key from the Providers tab.")
                 .font(.caption)
                 .foregroundColor(.secondary)
+        case .polzaAI:
+            TextField("Polza.ai model", text: $postProcessingModel, prompt: Text("openai/gpt-4o-mini"))
+                .textFieldStyle(.roundedBorder)
+            Text("Любая chat-модель из каталога Polza.ai. Использует ключ Polza.ai из таба Providers.")
+                .font(.caption)
+                .foregroundColor(.secondary)
         case .custom:
             TextField("Endpoint URL", text: $customEndpointURL, prompt: Text("https://api.polza.ai/v1/chat/completions"))
                 .textFieldStyle(.roundedBorder)
@@ -644,6 +664,12 @@ struct SettingsView: View {
                     Text(m.displayName).tag(m.id)
                 }
             }
+        case .polzaAI:
+            Picker("Model", selection: $modelOpenAI) {
+                ForEach(Preferences.availableOpenAIModels) { m in
+                    Text(m.displayName).tag(m.id)
+                }
+            }
         case .localWhisper:
             LabeledContent("Model") {
                 Text(localModelPath.isEmpty ? "not set" : URL(fileURLWithPath: localModelPath).lastPathComponent)
@@ -702,6 +728,8 @@ struct SettingsView: View {
             return "Routes audio to chat models like GPT-4o Audio Preview via /chat/completions. One key, many models."
         case .groq:
             return "OpenAI-compatible STT mirror. Whisper large-v3-turbo is roughly 10× faster and much cheaper than OpenAI direct."
+        case .polzaAI:
+            return "Российский LLM-агрегатор. OpenAI-совместимый API, оплата российскими картами, 400+ моделей."
         case .localWhisper:
             return "Runs whisper.cpp on your Mac via subprocess. Fully offline, no API key, no network."
         }
@@ -738,6 +766,7 @@ struct SettingsView: View {
         (openAIKey, openAIStatus) = loadKey(account: .openAI)
         (openRouterKey, openRouterStatus) = loadKey(account: .openRouter)
         (groqKey, groqStatus) = loadKey(account: .groq)
+        (polzaAIKey, polzaAIStatus) = loadKey(account: .polzaAI)
         (customEndpointKey, customEndpointKeyStatus) = loadKey(account: .customEndpoint)
         contextRules = Preferences.contextRules
     }

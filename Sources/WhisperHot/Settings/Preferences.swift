@@ -175,6 +175,7 @@ enum Preferences {
         case .openai: return modelOpenAI
         case .openRouter: return modelOpenRouter
         case .groq: return modelGroq
+        case .polzaAI: return modelOpenAI  // Polza.ai uses OpenAI model names
         case .localWhisper:
             let name = URL(fileURLWithPath: localWhisperModelPath).lastPathComponent
             return name.isEmpty ? "local" : "local/\(name)"
@@ -245,6 +246,7 @@ enum Preferences {
         case .openRouter: return postProcessingModel     // legacy key, OpenRouter namespace
         case .openAI: return postProcessingModelOpenAI
         case .groq: return postProcessingModelGroq
+        case .polzaAI: return postProcessingModel        // same OpenAI-compatible namespace
         case .custom: return customEndpointModel
         }
     }
@@ -406,6 +408,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
     case openRouter = "openrouter"
     case openAI = "openai"
     case groq = "groq"
+    case polzaAI = "polzaai"
     case custom = "custom"
 
     var id: String { rawValue }
@@ -415,6 +418,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
         case .openRouter: return "OpenRouter"
         case .openAI: return "OpenAI"
         case .groq: return "Groq"
+        case .polzaAI: return "Polza.ai"
         case .custom: return "Custom endpoint"
         }
     }
@@ -424,6 +428,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
         case .openRouter: return .openRouter
         case .openAI: return .openAI
         case .groq: return .groq
+        case .polzaAI: return .polzaAI
         case .custom: return .customEndpoint
         }
     }
@@ -435,6 +440,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
         case .openRouter: return URL(string: "https://openrouter.ai/api/v1/chat/completions")!
         case .openAI: return URL(string: "https://api.openai.com/v1/chat/completions")!
         case .groq: return URL(string: "https://api.groq.com/openai/v1/chat/completions")!
+        case .polzaAI: return URL(string: "https://polza.ai/api/v1/chat/completions")!
         case .custom:
             let raw = Preferences.customEndpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !raw.isEmpty, let url = URL(string: raw), url.scheme == "https" || url.scheme == "http" else {
@@ -451,7 +457,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
                 "HTTP-Referer": "https://github.com/LexorCrypto/whisper-hot",
                 "X-Title": "WhisperHot"
             ]
-        case .openAI, .groq, .custom:
+        case .openAI, .groq, .polzaAI, .custom:
             return [:]
         }
     }
@@ -462,6 +468,7 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
     case openai
     case openRouter = "openrouter"
     case groq
+    case polzaAI = "polzaai"
     case localWhisper = "localwhisper"
 
     var id: String { rawValue }
@@ -471,18 +478,17 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
         case .openai: return "OpenAI (/audio/transcriptions)"
         case .openRouter: return "OpenRouter (chat with audio)"
         case .groq: return "Groq (/audio/transcriptions)"
+        case .polzaAI: return "Polza.ai (OpenAI-совместимый, РФ)"
         case .localWhisper: return "Local whisper.cpp (fully offline)"
         }
     }
 
-    /// Short label used by the status-menu header row. `displayName`
-    /// includes the endpoint / transport suffix and would blow out
-    /// the menu width there.
     var shortName: String {
         switch self {
         case .openai: return "OpenAI"
         case .openRouter: return "OpenRouter"
         case .groq: return "Groq"
+        case .polzaAI: return "Polza.ai"
         case .localWhisper: return "Local"
         }
     }
@@ -492,6 +498,7 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
         case .openai: return .openAI
         case .openRouter: return .openRouter
         case .groq: return .groq
+        case .polzaAI: return .polzaAI
         case .localWhisper: return nil
         }
     }

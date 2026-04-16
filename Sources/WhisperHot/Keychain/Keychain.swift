@@ -8,6 +8,7 @@ enum Keychain {
         case openAI = "openai-api-key"
         case openRouter = "openrouter-api-key"
         case groq = "groq-api-key"
+        case polzaAI = "polzaai-api-key"
         case customEndpoint = "custom-endpoint-api-key"
         /// 32-byte random key used by HistoryStore for AES-GCM at-rest
         /// encryption of the transcript history file. Generated on first use
