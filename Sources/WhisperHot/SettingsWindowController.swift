@@ -16,13 +16,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             buildWindow()
         }
 
+        // Temporarily become a regular app so the menu bar shows
+        // "WhisperHot" next to the Apple logo and the window gets
+        // proper focus behavior. Reverted on close.
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
 
-        // Tell the hosted SwiftUI view to re-read Keychain state. The hosting
-        // view is built once and reused, so `.onAppear` only fires on first
-        // show — without this nudge, Settings would display stale API-key
-        // state across subsequent open/close cycles.
         NotificationCenter.default.post(name: .whisperHotSettingsWillShow, object: nil)
     }
 
@@ -34,7 +34,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         // so the window boots at a sensible size. The window is resizable,
         // so the user can grow or shrink it; SwiftUI enforces min/max on
         // the content.
-        hostingView.frame = NSRect(x: 0, y: 0, width: 640, height: 560)
+        hostingView.frame = NSRect(x: 0, y: 0, width: 740, height: 600)
 
         let newWindow = NSWindow(
             contentRect: hostingView.frame,
@@ -54,14 +54,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {
-        // Tell the hosted SwiftUI views (specifically `HotkeyRecorderView`)
-        // to drop their NSEvent monitors. The hosting view is reused across
-        // open/close cycles, so `.onDisappear` is not reliable here.
         NotificationCenter.default.post(name: .whisperHotSettingsWillClose, object: nil)
 
-        // Only restore the previously-focused app if WhisperHot is still
-        // frontmost at close time. Same focus-preservation rule as the
-        // onboarding window (see Block 7 review).
+        // Return to accessory mode so WhisperHot disappears from the Dock
+        // and menu bar, restoring the menu-bar-only behavior.
+        NSApp.setActivationPolicy(.accessory)
+
         let ourPID = ProcessInfo.processInfo.processIdentifier
         if NSWorkspace.shared.frontmostApplication?.processIdentifier == ourPID {
             previousApp?.activate(options: [])

@@ -71,24 +71,56 @@ struct SettingsView: View {
         }
     }
 
+    private enum SettingsSection: String, CaseIterable, Identifiable {
+        case recording
+        case providers
+        case postProcessing
+        case hotkey
+        case historyPrivacy
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .recording: return "Recording"
+            case .providers: return "Providers"
+            case .postProcessing: return "Post-processing"
+            case .hotkey: return "Hotkey"
+            case .historyPrivacy: return "History & Privacy"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .recording: return "mic.fill"
+            case .providers: return "key.fill"
+            case .postProcessing: return "wand.and.stars"
+            case .hotkey: return "keyboard"
+            case .historyPrivacy: return "clock"
+            }
+        }
+    }
+
+    @State private var selectedSection: SettingsSection = .recording
+
     // MARK: - Body
 
     var body: some View {
-        TabView {
-            recordingTab
-                .tabItem { Label("Recording", systemImage: "mic.fill") }
-            providersTab
-                .tabItem { Label("Providers", systemImage: "key.fill") }
-            postProcessingTab
-                .tabItem { Label("Post-processing", systemImage: "wand.and.stars") }
-            hotkeyTab
-                .tabItem { Label("Hotkey", systemImage: "keyboard") }
-            historyPrivacyTab
-                .tabItem { Label("History & Privacy", systemImage: "clock") }
+        NavigationSplitView {
+            List(SettingsSection.allCases, selection: $selectedSection) { section in
+                Label(section.label, systemImage: section.icon)
+                    .tag(section)
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
+        } detail: {
+            ScrollView {
+                detailContent
+                    .padding()
+            }
         }
-        .frame(minWidth: 620, idealWidth: 640, maxWidth: 760,
-               minHeight: 440, idealHeight: 560, maxHeight: 900)
-        .padding(.top, 8)
+        .frame(minWidth: 700, idealWidth: 740, maxWidth: 900,
+               minHeight: 480, idealHeight: 600, maxHeight: 900)
         .onAppear {
             normalizeStorageValues()
             reloadKeys()
@@ -98,6 +130,17 @@ struct SettingsView: View {
             normalizeStorageValues()
             reloadKeys()
             refreshLaunchAtLoginState()
+        }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selectedSection {
+        case .recording: recordingTab
+        case .providers: providersTab
+        case .postProcessing: postProcessingTab
+        case .hotkey: hotkeyTab
+        case .historyPrivacy: historyPrivacyTab
         }
     }
 
