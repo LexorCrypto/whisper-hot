@@ -10,6 +10,10 @@ struct ContextRule: Codable, Identifiable, Equatable, Sendable {
     /// Bundle identifier to match against `NSRunningApplication.bundleIdentifier`.
     /// Exact match. A value of "*" matches everything (fallback).
     var bundleID: String
+    /// Optional window title substring match. If set, the rule only matches
+    /// when the frontmost window title contains this string (case-insensitive).
+    /// Useful for browser-based apps: bundleID=Chrome + titleContains="gmail" → email.
+    var titleContains: String?
     /// Human-readable label shown in Settings (e.g. "Slack", "Mail").
     var label: String
     /// The post-processing preset applied when this rule matches.
@@ -22,11 +26,13 @@ struct ContextRule: Codable, Identifiable, Equatable, Sendable {
     init(
         id: UUID = UUID(),
         bundleID: String,
+        titleContains: String? = nil,
         label: String,
         preset: PostProcessingPreset
     ) {
         self.id = id
         self.bundleID = bundleID
+        self.titleContains = titleContains
         self.label = label
         self.presetRawValue = preset.rawValue
     }
@@ -35,6 +41,13 @@ struct ContextRule: Codable, Identifiable, Equatable, Sendable {
     static let defaults: [ContextRule] = [
         ContextRule(bundleID: "com.tinyspeck.slackmacgap", label: "Slack", preset: .slackCasual),
         ContextRule(bundleID: "com.apple.mail", label: "Apple Mail", preset: .emailStyle),
+        // Browser-specific: title-based matching for web apps (checked before generic browser rules)
+        ContextRule(bundleID: "com.google.Chrome", titleContains: "gmail", label: "Gmail (Chrome)", preset: .emailStyle),
+        ContextRule(bundleID: "com.google.Chrome", titleContains: "slack", label: "Slack (Chrome)", preset: .slackCasual),
+        ContextRule(bundleID: "com.google.Chrome", titleContains: "telegram", label: "Telegram (Chrome)", preset: .slackCasual),
+        ContextRule(bundleID: "com.apple.Safari", titleContains: "gmail", label: "Gmail (Safari)", preset: .emailStyle),
+        ContextRule(bundleID: "com.apple.Safari", titleContains: "slack", label: "Slack (Safari)", preset: .slackCasual),
+        // Generic browser rules (fallback for unmatched browser tabs)
         ContextRule(bundleID: "com.google.Chrome", label: "Chrome", preset: .cleanup),
         ContextRule(bundleID: "com.apple.Safari", label: "Safari", preset: .cleanup),
         ContextRule(bundleID: "org.mozilla.firefox", label: "Firefox", preset: .cleanup),
