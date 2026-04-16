@@ -51,6 +51,7 @@ Sources/WhisperHot/
 ├── Transcription/
 │   ├── TranscriptionService.swift  Протокол + TranscriptionOptions + result
 │   ├── FallbackTranscriptionService.swift  Offline fallback wrapper
+│   ├── WordReplacement.swift      Словарь замен (коммит→commit и т.д.)
 │   ├── TranscriptionError.swift
 │   └── Providers/
 │       ├── OpenAICompatibleSTTProvider.swift  OpenAI + Groq
