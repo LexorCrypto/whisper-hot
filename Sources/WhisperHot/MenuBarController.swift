@@ -316,7 +316,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         // --- Primary: Start / Stop recording ---
         let recordItem = NSMenuItem(
-            title: "Start Recording",
+            title: L10n.startRecording,
             action: #selector(toggleRecording(_:)),
             keyEquivalent: ""
         )
@@ -331,7 +331,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // submenu. Language and post-processing preset live in
         // Settings — they're infrequent to change and would bloat the
         // root menu if exposed here.
-        let providerParent = NSMenuItem(title: "Provider", action: nil, keyEquivalent: "")
+        let providerParent = NSMenuItem(title: L10n.provider, action: nil, keyEquivalent: "")
         let providerMenu = NSMenu()
         providerMenu.autoenablesItems = false
         for p in TranscriptionProvider.allCases {
@@ -354,7 +354,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         // --- Windows & commands ---
         let historyItem = NSMenuItem(
-            title: "Show History…",
+            title: L10n.history,
             action: #selector(openHistory(_:)),
             keyEquivalent: "h"
         )
@@ -362,7 +362,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(historyItem)
 
         let settingsItem = NSMenuItem(
-            title: "Settings…",
+            title: L10n.settings,
             action: #selector(openSettings(_:)),
             keyEquivalent: ","
         )
@@ -370,7 +370,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(settingsItem)
 
         let onboardingItem = NSMenuItem(
-            title: "Permissions & Onboarding…",
+            title: L10n.permissions,
             action: #selector(openOnboarding(_:)),
             keyEquivalent: ""
         )
@@ -380,7 +380,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         let aboutItem = NSMenuItem(
-            title: "About WhisperHot",
+            title: L10n.about,
             action: #selector(showAbout(_:)),
             keyEquivalent: ""
         )
@@ -388,7 +388,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(aboutItem)
 
         let quitItem = NSMenuItem(
-            title: "Quit WhisperHot",
+            title: L10n.quit,
             action: #selector(quit(_:)),
             keyEquivalent: "q"
         )
@@ -419,6 +419,35 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Rebuilds the header attributed title and the provider submenu
     /// checkmarks from current state. Cheap — runs in O(1 + providers).
     private func refreshDynamicMenuState() {
+        // Re-localize menu titles on every open so language changes
+        // from Settings take effect without relaunch.
+        if let menu = statusItem.menu {
+            for item in menu.items {
+                // Match by action selector to find the right items
+                if item.action == #selector(toggleRecording(_:)) {
+                    if state == .recording {
+                        item.title = L10n.stopRecording
+                    } else if state == .transcribing {
+                        item.title = L10n.transcribing
+                    } else {
+                        item.title = L10n.startRecording
+                    }
+                } else if item.action == #selector(openHistory(_:)) {
+                    item.title = L10n.history
+                } else if item.action == #selector(openSettings(_:)) {
+                    item.title = L10n.settings
+                } else if item.action == #selector(openOnboarding(_:)) {
+                    item.title = L10n.permissions
+                } else if item.action == #selector(showAbout(_:)) {
+                    item.title = L10n.about
+                } else if item.action == #selector(quit(_:)) {
+                    item.title = L10n.quit
+                } else if item.submenu != nil && item.action == nil {
+                    item.title = L10n.provider
+                }
+            }
+        }
+
         // Header row content — three bits of info:
         //   Line 1:  current state (Recording / Transcribing / Ready) + provider + model
         //   Line 2:  "Hotkey: <combo>"   (or Fn transport reminder)
@@ -517,7 +546,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             AudioRetentionSweeper.activeRecordingURL = url
             NSLog("WhisperHot: recording → \(url.path)")
             state = .recording
-            recordMenuItem?.title = "Stop Recording"
+            recordMenuItem?.title = L10n.stopRecording
             configureButton(recording: true)
             indicatorController.show()
             // Play AFTER the engine is armed so the chime is an honest
@@ -611,7 +640,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         } catch {
             NSLog("WhisperHot: stop error → \(error.localizedDescription)")
             state = .idle
-            recordMenuItem?.title = "Start Recording"
+            recordMenuItem?.title = L10n.startRecording
             configureButton(recording: false)
             indicatorController.hide()
             recordingTarget = nil
@@ -624,7 +653,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // Recorder stopped itself (e.g. audio configuration change). There is no
         // meaningful partial recording to transcribe — just return the menu to idle.
         state = .idle
-        recordMenuItem?.title = "Start Recording"
+        recordMenuItem?.title = L10n.startRecording
         configureButton(recording: false)
         indicatorController.hide()
         recordingTarget = nil
@@ -634,7 +663,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func kickOffTranscription(audioURL: URL, wantsRawOutput: Bool = false) {
         state = .transcribing
-        recordMenuItem?.title = "Transcribing…"
+        recordMenuItem?.title = L10n.transcribing
 
         let primaryService = makeTranscriptionService(for: Preferences.provider)
         // Wrap with offline fallback if local whisper is available
@@ -734,7 +763,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func finishTranscription(outcome: TranscriptionOutcome) {
         state = .idle
-        recordMenuItem?.title = "Start Recording"
+        recordMenuItem?.title = L10n.startRecording
         let target = recordingTarget
         recordingTarget = nil
         let lastAudioURL = currentRecordingURL

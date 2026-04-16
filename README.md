@@ -61,9 +61,13 @@ API-ключа в Keychain, приложение подтягивает прав
 
 1. Скачай последнюю версию: [**WhisperHot.dmg**](https://github.com/LexorCrypto/whisper-hot/releases/latest)
 2. Открой DMG, перетащи `WhisperHot.app` на ярлык Applications, размонтируй.
-3. Первый запуск из `/Applications/WhisperHot.app` упрётся в Gatekeeper
-   (сборка ad-hoc подписана, не нотаризована). Правый клик по приложению,
-   выбери **Open**, подтверди один раз. После этого macOS запомнит.
+3. **Перед первым запуском** сними карантинный атрибут в Терминале:
+   ```
+   xattr -cr /Applications/WhisperHot.app
+   ```
+   Без этого macOS Sequoia предложит удалить приложение (сборка
+   self-signed, не нотаризована). После `xattr -cr` приложение
+   запускается нормально навсегда.
 4. Иконка микрофона появится в menu bar, справа сверху. Если у тебя
    MacBook с notch и забитый menu bar, иконка может быть скрыта за
    notch'ем. Перетащи другие menu-bar иконки влево зажав Cmd, чтобы
@@ -208,7 +212,7 @@ File Provider переприклеивает `com.apple.FinderInfo` и
 
 - Подпись — локальный self-signed cert, не Developer ID, не
   нотаризован. Первый запуск свежеустановленной копии всё равно
-  упрётся в Gatekeeper (right-click → Open один раз). Между
+  упрётся в Gatekeeper (выполни `xattr -cr` как описано в Установке). Между
   пересборками идентичность стабильна, так что Keychain ACL и
   TCC grants переживают.
 - `.untilQuit` audio retention работает по принципу best-effort.

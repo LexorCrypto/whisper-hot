@@ -239,9 +239,10 @@ struct SettingsView: View {
 
     private var providersTab: some View {
         Form {
-            Section(L10n.service) {
+            Section(L10n.lang == .ru ? "Облачный провайдер" : "Cloud provider") {
                 Picker(L10n.provider, selection: $provider) {
-                    ForEach(TranscriptionProvider.allCases) { p in
+                    // Show cloud providers only; local whisper has its own section below
+                    ForEach(TranscriptionProvider.allCases.filter { $0 != .localWhisper }) { p in
                         Text(p.displayName).tag(p)
                     }
                 }
@@ -250,10 +251,6 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
-            // Only render the config block for the currently-selected
-            // provider. Users of Groq never see an OpenAI key field and
-            // vice versa — that was the biggest source of "where is what"
-            // confusion in the old flat layout.
             switch provider {
             case .openai:
                 apiKeyAndModelSection(
@@ -292,8 +289,11 @@ struct SettingsView: View {
                     modelPicker
                 }
             case .localWhisper:
-                localWhisperSection
+                EmptyView() // handled in the permanent section below
             }
+
+            // Always-visible local whisper section at the bottom
+            localWhisperSection
         }
         .formStyle(.grouped)
     }
@@ -321,6 +321,15 @@ struct SettingsView: View {
 
     private var localWhisperSection: some View {
         Section("Local whisper.cpp") {
+            // Toggle to use local whisper as the active provider
+            Toggle(
+                L10n.lang == .ru ? "Использовать локальную транскрипцию" : "Use local transcription",
+                isOn: Binding(
+                    get: { provider == .localWhisper },
+                    set: { newValue in provider = newValue ? .localWhisper : .openai }
+                )
+            )
+
             // Status + one-click install
             HStack {
                 switch whisperInstaller.status {
