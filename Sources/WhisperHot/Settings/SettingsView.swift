@@ -58,6 +58,7 @@ struct SettingsView: View {
     @State private var customEndpointKey: String = ""
     @State private var customEndpointKeyStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var contextRules: [ContextRule] = Preferences.contextRules
+    @StateObject private var whisperInstaller = WhisperInstaller()
 
     private struct StatusMessage {
         enum Kind { case primary, secondary, success, error }
@@ -315,33 +316,80 @@ struct SettingsView: View {
 
     private var localWhisperSection: some View {
         Section("Local whisper.cpp") {
-            LabeledContent("Binary") {
-                HStack(spacing: 8) {
-                    Text(pathDisplay(localBinaryPath))
+            // Status + one-click install
+            HStack {
+                switch whisperInstaller.status {
+                case .installed:
+                    Label(L10n.lang == .ru ? "Установлено" : "Installed", systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                case .notInstalled:
+                    Label(L10n.lang == .ru ? "Не установлено" : "Not installed", systemImage: "xmark.circle")
+                        .foregroundColor(.secondary)
+                case .installing(let step):
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(step)
                         .font(.caption)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button("Choose…") { pickBinary() }
-                    if !localBinaryPath.isEmpty {
-                        Button("Clear") { localBinaryPath = "" }
+                        .foregroundColor(.secondary)
+                case .downloading(let progress):
+                    ProgressView(value: progress)
+                        .frame(width: 120)
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                case .failed(let message):
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+                Spacer()
+                switch whisperInstaller.status {
+                case .notInstalled, .failed:
+                    Button(L10n.lang == .ru ? "Установить" : "Install") {
+                        Task { await whisperInstaller.install() }
+                    }
+                case .installing, .downloading:
+                    Button(L10n.lang == .ru ? "Отмена" : "Cancel") {
+                        whisperInstaller.cancel()
+                    }
+                case .installed:
+                    EmptyView()
+                }
+            }
+
+            // Manual path overrides (advanced)
+            DisclosureGroup(L10n.lang == .ru ? "Ручная настройка путей" : "Manual path configuration") {
+                LabeledContent(L10n.binary) {
+                    HStack(spacing: 8) {
+                        Text(pathDisplay(localBinaryPath))
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button(L10n.choose) { pickBinary() }
+                        if !localBinaryPath.isEmpty {
+                            Button(L10n.clear) { localBinaryPath = "" }
+                        }
+                    }
+                }
+                LabeledContent(L10n.ggmlModel) {
+                    HStack(spacing: 8) {
+                        Text(pathDisplay(localModelPath))
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button(L10n.choose) { pickModel() }
+                        if !localModelPath.isEmpty {
+                            Button(L10n.clear) { localModelPath = "" }
+                        }
                     }
                 }
             }
-            LabeledContent("GGML model") {
-                HStack(spacing: 8) {
-                    Text(pathDisplay(localModelPath))
-                        .font(.caption)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button("Choose…") { pickModel() }
-                    if !localModelPath.isEmpty {
-                        Button("Clear") { localModelPath = "" }
-                    }
-                }
-            }
-            Text("Install via Homebrew (`brew install whisper-cpp`) or build from source, then download a GGML model from huggingface.co/ggerganov/whisper.cpp.")
+
+            Text(L10n.lang == .ru
+                ? "Нажмите «Установить» для автоматической установки whisper-cpp через Homebrew и загрузки модели ggml-base (~142 МБ). Или настройте пути вручную."
+                : "Click Install to automatically set up whisper-cpp via Homebrew and download the ggml-base model (~142 MB). Or configure paths manually.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
