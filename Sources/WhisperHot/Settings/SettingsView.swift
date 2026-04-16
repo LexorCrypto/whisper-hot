@@ -59,6 +59,8 @@ struct SettingsView: View {
     @State private var customEndpointKeyStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var contextRules: [ContextRule] = Preferences.contextRules
     @StateObject private var whisperInstaller = WhisperInstaller()
+    @AppStorage(Preferences.Key.vocabularyHints) private var vocabularyHints: String = ""
+    @State private var wordReplacements: [WordReplacement] = Preferences.wordReplacements
     @State private var showManualWhisperPaths = !Preferences.localWhisperBinaryPath.isEmpty || !Preferences.localWhisperModelPath.isEmpty
     @StateObject private var updateChecker = UpdateChecker()
 
@@ -204,6 +206,62 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
+            }
+
+            Section(L10n.lang == .ru ? "Технический словарь" : "Technical vocabulary") {
+                TextField(
+                    L10n.lang == .ru ? "Подсказки для распознавания" : "Recognition hints",
+                    text: $vocabularyHints,
+                    prompt: Text("commit, deploy, push, Codex, OpenClaw, Claude, Docker"),
+                    axis: .vertical
+                )
+                .lineLimit(2...4)
+                .textFieldStyle(.roundedBorder)
+                Text(L10n.lang == .ru
+                    ? "Через запятую. Передаются провайдеру как подсказка для лучшего распознавания технических терминов."
+                    : "Comma-separated. Passed to the STT provider as hints for better recognition of technical terms.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                // Word replacements
+                ForEach($wordReplacements) { $replacement in
+                    HStack(spacing: 4) {
+                        TextField("от", text: $replacement.from)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 120)
+                        Image(systemName: "arrow.right")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        TextField("на", text: $replacement.to)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 120)
+                        Button(role: .destructive) {
+                            wordReplacements.removeAll { $0.id == replacement.id }
+                            Preferences.wordReplacements = wordReplacements
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                .onChange(of: wordReplacements) { _ in
+                    Preferences.wordReplacements = wordReplacements
+                }
+                HStack {
+                    Button(L10n.lang == .ru ? "Добавить замену" : "Add replacement") {
+                        wordReplacements.append(WordReplacement(from: "", to: ""))
+                        Preferences.wordReplacements = wordReplacements
+                    }
+                    Button(L10n.resetToDefaults) {
+                        wordReplacements = WordReplacement.defaults
+                        Preferences.wordReplacements = wordReplacements
+                    }
+                }
+                Text(L10n.lang == .ru
+                    ? "Замены применяются к тексту сразу после транскрипции (до LLM-обработки). Регистр не учитывается."
+                    : "Replacements are applied right after transcription (before LLM processing). Case-insensitive.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section(L10n.startup) {

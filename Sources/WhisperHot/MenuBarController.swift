@@ -677,6 +677,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         var options = TranscriptionOptions()
         options.model = Preferences.currentModel
         options.language = Preferences.language
+        // Pass vocabulary hints as prompt bias for better tech term recognition
+        let hints = Preferences.vocabularyHints.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !hints.isEmpty {
+            options.prompt = hints
+        }
+        // Snapshot word replacements for post-transcription fixup
+        let wordReplacements = Preferences.wordReplacements
 
         // If the user requested raw output (⌥⌘⇧5), skip post-processing entirely.
         let skipPostProcessing = wantsRawOutput || !Preferences.postProcessingEnabled
@@ -736,14 +743,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             do {
                 let raw = try await service.transcribe(audioURL: audioURL, options: options)
 
-                var finalResult = raw
+                // Apply word replacements before post-processing
+                let fixedText = wordReplacements.isEmpty
+                    ? raw.text
+                    : WordReplacement.applyAll(wordReplacements, to: raw.text)
+                var finalResult = TranscriptionResult(
+                    text: fixedText,
+                    providerModel: raw.providerModel,
+                    postProcessing: raw.postProcessing,
+                    usedOfflineFallback: raw.usedOfflineFallback
+                )
 
                 // Skip post-processing if offline fallback was used (LLM also needs network)
                 if raw.usedOfflineFallback {
                     NSLog("WhisperHot: offline fallback used, skipping post-processing")
                 } else if let localLLM = localLLMProcessor, let ppOptions = postProcessingOptions {
                     do {
-                        let processed = try await localLLM.process(text: raw.text, options: ppOptions)
+                        let processed = try await localLLM.process(text: fixedText, options: ppOptions)
                         finalResult = TranscriptionResult(
                             text: processed,
                             providerModel: raw.providerModel,
@@ -752,7 +768,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     } catch {
                         NSLog("WhisperHot: local LLM failed → \(error.localizedDescription)")
                         finalResult = TranscriptionResult(
-                            text: raw.text,
+                            text: fixedText,
                             providerModel: raw.providerModel,
                             postProcessing: .failed(reason: error.localizedDescription)
                         )
@@ -760,7 +776,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 } else if let postProcessor, let ppOptions = postProcessingOptions {
                     do {
                         let processed = try await postProcessor.process(
-                            text: raw.text,
+                            text: fixedText,
                             options: ppOptions
                         )
                         finalResult = TranscriptionResult(
@@ -777,7 +793,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                         // surface it visibly to the user.
                         NSLog("WhisperHot: post-processing failed → \(error.localizedDescription)")
                         finalResult = TranscriptionResult(
-                            text: raw.text,
+                            text: fixedText,
                             providerModel: raw.providerModel,
                             postProcessing: .failed(reason: error.localizedDescription)
                         )

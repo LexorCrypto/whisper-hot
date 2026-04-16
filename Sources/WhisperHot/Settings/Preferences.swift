@@ -36,6 +36,8 @@ enum Preferences {
         static let customEndpointModel = "WhisperHot.customEndpointModel"
         static let localLLMBinaryPath = "WhisperHot.localLLMBinaryPath"
         static let localLLMModelPath = "WhisperHot.localLLMModelPath"
+        static let vocabularyHints = "WhisperHot.vocabularyHints"
+        static let wordReplacements = "WhisperHot.wordReplacements"
         static let appLanguage = "WhisperHot.appLanguage"
     }
 
@@ -233,6 +235,28 @@ enum Preferences {
 
     static var postProcessingModelGroq: String {
         UserDefaults.standard.string(forKey: Key.postProcessingModelGroq) ?? Defaults.postProcessingModelGroq
+    }
+
+    /// Vocabulary hints passed to the STT provider as a prompt bias.
+    /// Comma-separated technical terms: "commit, deploy, push, Codex".
+    static var vocabularyHints: String {
+        UserDefaults.standard.string(forKey: Key.vocabularyHints) ?? ""
+    }
+
+    /// Word replacements applied after transcription. Stored as JSON
+    /// array of {"from":"коммит","to":"commit"} objects.
+    static var wordReplacements: [WordReplacement] {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: Key.wordReplacements) else {
+                return WordReplacement.defaults
+            }
+            return (try? JSONDecoder().decode([WordReplacement].self, from: data)) ?? WordReplacement.defaults
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                UserDefaults.standard.set(data, forKey: Key.wordReplacements)
+            }
+        }
     }
 
     static var localLLMBinaryPath: String {
