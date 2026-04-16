@@ -59,6 +59,7 @@ struct SettingsView: View {
     @State private var customEndpointKeyStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var contextRules: [ContextRule] = Preferences.contextRules
     @StateObject private var whisperInstaller = WhisperInstaller()
+    @StateObject private var updateChecker = UpdateChecker()
 
     private struct StatusMessage {
         enum Kind { case primary, secondary, success, error }
@@ -81,6 +82,7 @@ struct SettingsView: View {
         case postProcessing
         case hotkey
         case historyPrivacy
+        case updates
 
         var id: String { rawValue }
 
@@ -91,6 +93,7 @@ struct SettingsView: View {
             case .postProcessing: return L10n.postProcessing
             case .hotkey: return L10n.hotkey
             case .historyPrivacy: return L10n.historyPrivacy
+            case .updates: return L10n.lang == .ru ? "Обновления" : "Updates"
             }
         }
 
@@ -101,6 +104,7 @@ struct SettingsView: View {
             case .postProcessing: return "wand.and.stars"
             case .hotkey: return "keyboard"
             case .historyPrivacy: return "clock"
+            case .updates: return "arrow.triangle.2.circlepath"
             }
         }
     }
@@ -145,6 +149,7 @@ struct SettingsView: View {
         case .postProcessing: postProcessingTab
         case .hotkey: hotkeyTab
         case .historyPrivacy: historyPrivacyTab
+        case .updates: updatesTab
         }
     }
 
@@ -693,6 +698,71 @@ struct SettingsView: View {
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Tab: Updates
+
+    private var updatesTab: some View {
+        Form {
+            Section(L10n.lang == .ru ? "Версия" : "Version") {
+                HStack {
+                    Text(L10n.lang == .ru ? "Текущая версия:" : "Current version:")
+                    Text(updateChecker.currentVersion)
+                        .fontWeight(.medium)
+                }
+
+                switch updateChecker.status {
+                case .idle:
+                    EmptyView()
+                case .checking:
+                    HStack {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(L10n.lang == .ru ? "Проверяю..." : "Checking...")
+                            .foregroundColor(.secondary)
+                    }
+                case .upToDate(let version):
+                    Label(
+                        L10n.lang == .ru ? "Вы используете последнюю версию (\(version))" : "You're on the latest version (\(version))",
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .foregroundColor(.green)
+                case .updateAvailable(let current, let latest, _):
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label(
+                            L10n.lang == .ru ? "Доступна версия \(latest) (у вас \(current))" : "Version \(latest) available (you have \(current))",
+                            systemImage: "arrow.down.circle.fill"
+                        )
+                        .foregroundColor(.orange)
+                        Button(L10n.lang == .ru ? "Скачать обновление" : "Download update") {
+                            updateChecker.openDownload()
+                        }
+                    }
+                case .failed(let message):
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+
+                Button(L10n.lang == .ru ? "Проверить обновления" : "Check for updates") {
+                    Task { await updateChecker.check(force: true) }
+                }
+            }
+
+            Section(L10n.lang == .ru ? "О приложении" : "About") {
+                Text("WhisperHot \(updateChecker.currentVersion)")
+                    .font(.headline)
+                Text(L10n.lang == .ru
+                    ? "macOS приложение для голосовой транскрипции. Apple Silicon (M1+), macOS 13.0+."
+                    : "macOS speech-to-text app. Apple Silicon (M1+), macOS 13.0+.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("Apache License 2.0")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
