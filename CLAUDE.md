@@ -1,5 +1,26 @@
 # WhisperHot
 
+macOS menu bar приложение для speech-to-text. Swift 5.9 / SwiftPM, zero dependencies,
+macOS 13.0+, Apple Silicon (ARM64).
+
+## Сборка и запуск
+
+```bash
+swift build -c release      # компиляция
+./build.sh                  # подписанный .app bundle
+./build-dmg.sh              # DMG для распространения
+```
+
+## Структура проекта
+
+- `Sources/WhisperHot/` — 35 Swift файлов (~5800 строк)
+- `Sources/WhisperHot/MenuBarController.swift` — state machine hub (819+ строк)
+- `Sources/WhisperHot/ContextRouter/` — контекстный роутинг (bundle ID → preset)
+- `Sources/WhisperHot/PostProcessing/` — LLM пост-обработка (4 провайдера)
+- `Sources/WhisperHot/Indicator/` — индикаторы записи (4 стиля)
+- `Sources/WhisperHot/Settings/` — Preferences + SettingsView (5 табов)
+- `Resources/Sounds/` — кастомные AIFF звуки
+
 ## Маршрутизация навыков (Skill routing)
 
 Когда запрос пользователя совпадает с доступным навыком, ВСЕГДА вызывай его через

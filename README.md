@@ -5,10 +5,10 @@
 приложение, где ты сейчас печатаешь. Жмёшь `⌥⌘5`, говоришь, снова жмёшь
 `⌥⌘5`, транскрипт оказывается у курсора.
 
-Статус: **0.3.0** — personal build. Подписан стабильным локальным
+Статус: **0.4.0** — personal build. Подписан стабильным локальным
 self-signed сертификатом (`whisper-hot-local`), не нотаризован,
-собран одним разработчиком. До 0.2.2 приложение называлось
-WhisperLocal; 0.3.0 — переименование.
+собран одним разработчиком. 0.4.0 добавляет контекстный роутинг,
+мульти-провайдер пост-обработку, реверсивный вывод и premium визуал.
 
 ## Что делает
 
@@ -107,18 +107,20 @@ Accessibility не выдан, WhisperHot сам стал frontmost), транс
 
 - **Recording** — язык (auto + 15 языков), auto-paste в активное
   приложение, звуковые chimes, стиль индикатора
-  (menubar-only / mini pill / classic waveform), Launch at login
-  через `SMAppService.mainApp`.
+  (menubar-only / mini pill / classic waveform / floating capsule),
+  Launch at login через `SMAppService.mainApp`.
 - **Providers** — один picker сверху выбирает сервис (OpenAI /
   OpenRouter / Groq / Local whisper.cpp). Ниже показываются только
   поля выбранного провайдера: API-ключ + model picker, либо пути
   к `whisper.cpp` бинарю + GGML модели для локального режима.
   У каждого провайдера свой слот в Keychain, переключение не
   требует рестарта.
-- **Post-processing** — тумблер LLM cleanup после транскрибации и
+- **Post-processing** — тумблер LLM cleanup после транскрибации,
+  выбор провайдера (OpenRouter / OpenAI / Groq / custom endpoint),
   выбор пресета (Cleanup fillers, Email style, Slack casual,
-  Technical docs, Translate to English, Custom). Использует твой
-  OpenRouter ключ из Providers. Выключено по умолчанию.
+  Technical docs, Translate to English, Custom), контекстный роутинг
+  (автовыбор пресета по активному приложению), и `⌥⌘⇧5` для raw
+  output без обработки. Выключено по умолчанию.
 - **Hotkey** — кастомный рекордер (`⌥⌘5` по умолчанию, кнопка
   Reset возвращает его). Рядом экспериментальный Fn (🌐) тумблер:
   хрупко, потому что macOS резервирует Fn под Dictation / Show

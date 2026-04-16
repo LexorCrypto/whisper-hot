@@ -1,7 +1,7 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 32 Swift файла, ~5100 строк. AppKit — основная оболочка,
+приложение. 35 Swift файлов, ~5800 строк. AppKit — основная оболочка,
 SwiftUI живёт внутри Settings, Onboarding, History и recording
 indicator через `NSHostingView`.
 
@@ -37,10 +37,15 @@ Sources/WhisperHot/
 ├── Audio/
 │   ├── AudioError.swift
 │   ├── AudioRecorder.swift       AVAudioEngine → 16 kHz mono PCM WAV
-│   └── SoundPlayer.swift         AudioServicesPlaySystemSound chimes
+│   └── SoundPlayer.swift         Custom AIFF из bundle, fallback на системные
+│
+├── ContextRouter/
+│   ├── ContextRule.swift          Модель правила (bundleID → preset)
+│   └── ContextRouter.swift        Маршрутизатор: target app → PostProcessingPreset
 │
 ├── Hotkey/
-│   ├── HotkeyManager.swift       Carbon RegisterEventHotKey (⌥⌘5 default)
+│   ├── HotkeyManager.swift       Carbon RegisterEventHotKey (⌥⌘5 + ⌥⌘⇧5 raw)
+│   ├── HotkeyRecorder.swift      SwiftUI recorder для кастомного хоткея
 │   └── FnKeyMonitor.swift        CGEventTap на maskSecondaryFn (opt-in)
 │
 ├── Transcription/
@@ -53,7 +58,7 @@ Sources/WhisperHot/
 │
 ├── PostProcessing/
 │   ├── PostProcessingPreset.swift  Cleanup, email, Slack, technical, ...
-│   └── LLMPostProcessor.swift      OpenRouter /chat/completions (text only)
+│   └── LLMPostProcessor.swift      /chat/completions (OpenRouter/OpenAI/Groq/custom)
 │
 ├── Paste/
 │   └── PasteService.swift        Pasteboard write + guarded CGEventPost
@@ -72,7 +77,8 @@ Sources/WhisperHot/
 │   ├── IndicatorController.swift   NSPanel owner; читает Preferences
 │   ├── IndicatorViewModel.swift    20 Hz RMS + elapsed publisher
 │   ├── MiniPillView.swift          Capsule с pulse dot
-│   └── ClassicWaveformView.swift   Canvas bar renderer
+│   ├── ClassicWaveformView.swift   Canvas bar renderer
+│   └── FloatingCapsuleView.swift   Premium: blur material + TimelineView waveform
 │
 ├── Keychain/
 │   └── Keychain.swift            String + Data API, не-синкаемые items

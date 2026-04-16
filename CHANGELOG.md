@@ -2,6 +2,49 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.4.0] — 2026-04-16
+
+Полная замена SuperWhisper: контекстный роутинг, мульти-провайдер
+пост-обработка, реверсивный вывод и premium визуал.
+
+### Для пользователей
+
+- **Контекстный роутинг.** WhisperHot определяет, в каком приложении
+  ты диктуешь, и автоматически подбирает стиль обработки: Slack получает
+  казуальный текст, Mail формальный, VS Code техническую документацию.
+  Правила настраиваются в Settings → Post-processing → Context routing.
+  По умолчанию 13 предустановленных правил для популярных приложений.
+- **Мульти-провайдер пост-обработка.** LLM cleanup теперь работает
+  через любой из 4 провайдеров: OpenRouter, OpenAI, Groq, или любой
+  OpenAI-совместимый endpoint (Polza.ai и другие агрегаторы). Выбирается
+  явно в Settings, API-ключ берётся из Keychain выбранного провайдера.
+- **Реверсивный вывод.** Нажми `⌥⌘⇧5` (с Shift) вместо `⌥⌘5`, чтобы
+  вставить сырой транскрипт без LLM-обработки. Полезно когда LLM
+  переусердствует или нужен дословный текст.
+- **Floating capsule.** Новый стиль индикатора записи: капсула с
+  blur-эффектом, анимированная waveform на 60 fps через TimelineView,
+  пульсирующая красная точка. Включается в Settings → Recording →
+  Indicator style.
+- **Кастомные звуки.** Три оригинальных тона (start, stop, done)
+  вместо системных Morse/Tink/Glass. Если custom звуки не найдены
+  в бандле, приложение использует системные как fallback.
+
+### Для разработчиков
+
+- `ContextRouter/` — новый модуль. `ContextRule` (модель правила) и
+  `ContextRouter` (чистая функция resolve: target → preset).
+- `LLMPostProcessor` параметризован: endpoint URL, extraHeaders,
+  apiKeyProvider как init params. Один класс, 4 провайдера.
+- `HotkeyManager` регистрирует 2 Carbon hotkey: primary и raw
+  (primary + Shift). Guardrail: если base combo уже содержит Shift,
+  raw hotkey не регистрируется.
+- `FloatingCapsuleView` — SwiftUI + TimelineView(.animation) + Canvas.
+- `SoundPlayer` загружает custom AIFF из app bundle, fallback на
+  `/System/Library/Sounds/`.
+- `build.sh` копирует `Resources/Sounds/` в `.app` bundle.
+- `PostProcessingProvider` enum с endpoint URLs, extraHeaders, и
+  Keychain account маппингом.
+
 ## [0.3.0] — 2026-04-16
 
 Переименование WhisperLocal → WhisperHot и переделка menu bar меню.
