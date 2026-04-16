@@ -32,6 +32,12 @@ struct SettingsView: View {
     @AppStorage(Preferences.Key.fnKeyEnabled) private var fnKeyEnabled: Bool = Preferences.Defaults.fnKeyEnabled
     @AppStorage(Preferences.Key.hotkeyKeyCode) private var hotkeyKeyCode: Int = Preferences.Defaults.hotkeyKeyCode
     @AppStorage(Preferences.Key.hotkeyModifiers) private var hotkeyModifiers: Int = Preferences.Defaults.hotkeyModifiers
+    @AppStorage(Preferences.Key.contextRoutingEnabled) private var contextRoutingEnabled: Bool = Preferences.Defaults.contextRoutingEnabled
+    @AppStorage(Preferences.Key.postProcessingProvider) private var ppProvider: PostProcessingProvider = .openRouter
+    @AppStorage(Preferences.Key.postProcessingModelOpenAI) private var ppModelOpenAI: String = Preferences.Defaults.postProcessingModelOpenAI
+    @AppStorage(Preferences.Key.postProcessingModelGroq) private var ppModelGroq: String = Preferences.Defaults.postProcessingModelGroq
+    @AppStorage(Preferences.Key.customEndpointURL) private var customEndpointURL: String = Preferences.Defaults.customEndpointURL
+    @AppStorage(Preferences.Key.customEndpointModel) private var customEndpointModel: String = Preferences.Defaults.customEndpointModel
 
     @State private var launchAtLoginEnabled: Bool = LaunchAtLoginController.isEnabled
     @State private var launchAtLoginStatus: String = LaunchAtLoginController.statusDescription
@@ -46,6 +52,9 @@ struct SettingsView: View {
     @State private var openRouterStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var groqKey: String = ""
     @State private var groqStatus: StatusMessage = .init(text: "", kind: .secondary)
+    @State private var customEndpointKey: String = ""
+    @State private var customEndpointKeyStatus: StatusMessage = .init(text: "", kind: .secondary)
+    @State private var contextRules: [ContextRule] = Preferences.contextRules
 
     private struct StatusMessage {
         enum Kind { case primary, secondary, success, error }
@@ -278,9 +287,21 @@ struct SettingsView: View {
         Form {
             Section("LLM cleanup") {
                 Toggle("Run LLM cleanup after transcription", isOn: $postProcessingEnabled)
-                Text("Sends the raw transcript through an OpenRouter chat model to clean fillers, rewrite for tone, translate, or whatever the preset defines. Costs one extra API call per recording. Uses the OpenRouter key from the Providers tab.")
+                Text("Sends the raw transcript through an LLM to clean fillers, rewrite for tone, or translate. Costs one extra API call per recording. Tip: press ⌥⌘⇧5 instead of ⌥⌘5 to skip cleanup and paste raw text.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+
+            Section("Provider") {
+                Picker("Post-processing provider", selection: $ppProvider) {
+                    ForEach(PostProcessingProvider.allCases) { p in
+                        Text(p.displayName).tag(p)
+                    }
+                }
+                .disabled(!postProcessingEnabled)
+
+                ppModelSection
+                    .disabled(!postProcessingEnabled)
             }
 
             Section("Preset") {
@@ -308,16 +329,121 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Model") {
-                TextField("OpenRouter slug", text: $postProcessingModel, prompt: Text("openai/gpt-4o-mini"))
-                    .textFieldStyle(.roundedBorder)
+            Section("Context routing") {
+                Toggle("Auto-select preset based on active app", isOn: $contextRoutingEnabled)
                     .disabled(!postProcessingEnabled)
-                Text("Any chat-capable model from the OpenRouter catalog.")
+                Text("When enabled, the preset is chosen automatically based on the app you're dictating into (e.g. Slack = casual, Mail = formal). You can customize the rules below.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                if contextRoutingEnabled && postProcessingEnabled {
+                    ForEach($contextRules) { $rule in
+                        HStack(spacing: 6) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                TextField("Label", text: $rule.label)
+                                    .font(.body)
+                                    .textFieldStyle(.plain)
+                                TextField("Bundle ID", text: $rule.bundleID)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .textFieldStyle(.plain)
+                            }
+                            .frame(width: 160, alignment: .leading)
+                            Picker("", selection: $rule.presetRawValue) {
+                                ForEach(PostProcessingPreset.allCases) { preset in
+                                    Text(preset.displayName).tag(preset.rawValue)
+                                }
+                            }
+                            .labelsHidden()
+                            if rule.bundleID != "*" {
+                                Button(role: .destructive) {
+                                    contextRules.removeAll { $0.id == rule.id }
+                                    Preferences.contextRules = contextRules
+                                } label: {
+                                    Image(systemName: "minus.circle")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                    }
+                    .onChange(of: contextRules) { _ in
+                        Preferences.contextRules = contextRules
+                    }
+                    HStack(spacing: 8) {
+                        Button("Add rule...") {
+                            let newRule = ContextRule(
+                                bundleID: "com.example.app",
+                                label: "New App",
+                                preset: .cleanup
+                            )
+                            // Insert before the "*" fallback rule if it exists
+                            if let fallbackIdx = contextRules.lastIndex(where: { $0.bundleID == "*" }) {
+                                contextRules.insert(newRule, at: fallbackIdx)
+                            } else {
+                                contextRules.append(newRule)
+                            }
+                            Preferences.contextRules = contextRules
+                        }
+                        Button("Reset to defaults") {
+                            contextRules = ContextRule.defaults
+                            Preferences.contextRules = contextRules
+                        }
+                    }
+                    Text("Tip: to find an app's bundle ID, run in Terminal: osascript -e 'id of app \"AppName\"'")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var ppModelSection: some View {
+        switch ppProvider {
+        case .openRouter:
+            TextField("OpenRouter model", text: $postProcessingModel, prompt: Text("openai/gpt-4o-mini"))
+                .textFieldStyle(.roundedBorder)
+            Text("Any chat model from the OpenRouter catalog. Uses your OpenRouter key from the Providers tab.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        case .openAI:
+            TextField("OpenAI model", text: $ppModelOpenAI, prompt: Text("gpt-4o-mini"))
+                .textFieldStyle(.roundedBorder)
+            Text("Uses your OpenAI key from the Providers tab.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        case .groq:
+            TextField("Groq model", text: $ppModelGroq, prompt: Text("llama-3.1-8b-instant"))
+                .textFieldStyle(.roundedBorder)
+            Text("Groq chat completions model. Uses your Groq key from the Providers tab.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        case .custom:
+            TextField("Endpoint URL", text: $customEndpointURL, prompt: Text("https://api.polza.ai/v1/chat/completions"))
+                .textFieldStyle(.roundedBorder)
+            if !customEndpointURL.isEmpty, PostProcessingProvider.custom.endpoint == nil {
+                Label("Invalid URL. Must start with https:// or http://", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+            TextField("Model name", text: $customEndpointModel, prompt: Text("gpt-4o-mini"))
+                .textFieldStyle(.roundedBorder)
+            if customEndpointModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Label("Model name is required", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+            apiKeyControls(
+                account: .customEndpoint,
+                binding: $customEndpointKey,
+                status: $customEndpointKeyStatus,
+                placeholder: "API key"
+            )
+            Text("Any OpenAI-compatible /chat/completions endpoint (e.g. Polza.ai, Together.ai).")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
     }
 
     // MARK: - Tab: Hotkey
@@ -569,6 +695,8 @@ struct SettingsView: View {
         (openAIKey, openAIStatus) = loadKey(account: .openAI)
         (openRouterKey, openRouterStatus) = loadKey(account: .openRouter)
         (groqKey, groqStatus) = loadKey(account: .groq)
+        (customEndpointKey, customEndpointKeyStatus) = loadKey(account: .customEndpoint)
+        contextRules = Preferences.contextRules
     }
 
     private func loadKey(account: Keychain.Account) -> (String, StatusMessage) {
