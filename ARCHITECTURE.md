@@ -80,6 +80,9 @@ Sources/WhisperHot/
 │   ├── ClassicWaveformView.swift   Canvas bar renderer
 │   └── FloatingCapsuleView.swift   Premium: blur material + TimelineView waveform
 │
+├── Localization/
+│   └── L10n.swift                Русский/английский UI, переключатель в Settings
+│
 ├── Keychain/
 │   └── Keychain.swift            String + Data API, не-синкаемые items
 │

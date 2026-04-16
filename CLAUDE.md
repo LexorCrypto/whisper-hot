@@ -18,7 +18,8 @@ swift build -c release      # компиляция
 - `Sources/WhisperHot/ContextRouter/` — контекстный роутинг (bundle ID → preset)
 - `Sources/WhisperHot/PostProcessing/` — LLM пост-обработка (4 провайдера)
 - `Sources/WhisperHot/Indicator/` — индикаторы записи (4 стиля)
-- `Sources/WhisperHot/Settings/` — Preferences + SettingsView (5 табов)
+- `Sources/WhisperHot/Settings/` — Preferences + SettingsView (sidebar, 5 секций)
+- `Sources/WhisperHot/Localization/` — L10n.swift (русский/английский UI)
 - `Resources/Sounds/` — кастомные AIFF звуки
 
 ## Маршрутизация навыков (Skill routing)

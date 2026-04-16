@@ -28,6 +28,15 @@
 - **Кастомные звуки.** Три оригинальных тона (start, stop, done)
   вместо системных Morse/Tink/Glass. Если custom звуки не найдены
   в бандле, приложение использует системные как fallback.
+- **Polza.ai.** Российский LLM-агрегатор добавлен как именованный
+  провайдер для транскрипции и пост-обработки. OpenAI-совместимый
+  API, оплата российскими картами.
+- **Sidebar навигация.** Настройки переделаны из горизонтальных табов
+  в боковую панель (как в System Settings macOS).
+- **"WhisperHot" в меню.** При открытии Settings имя приложения
+  появляется в строке меню рядом с яблочком, при закрытии исчезает.
+- **Русский интерфейс.** Весь UI переведён на русский язык.
+  Переключатель языка (русский / английский) в Settings → Запись.
 
 ### Для разработчиков
 
@@ -44,6 +53,11 @@
 - `build.sh` копирует `Resources/Sounds/` в `.app` bundle.
 - `PostProcessingProvider` enum с endpoint URLs, extraHeaders, и
   Keychain account маппингом.
+- `Localization/L10n.swift` — простая enum-based локализация (~150
+  строк). Все UI строки через `L10n.*` computed properties.
+- `SettingsView` переделан на `NavigationSplitView` (sidebar).
+- `SettingsWindowController` переключает activation policy (`.regular`
+  при открытии, `.accessory` при закрытии).
 
 ## [0.3.0] — 2026-04-16
 
