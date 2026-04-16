@@ -12,7 +12,9 @@ final class IndicatorViewModel: ObservableObject {
 
     private let rmsProvider: () -> Float
     private var timer: Timer?
-    private var startDate: Date?
+    /// Exposed for TimelineView-based indicators that compute phase
+    /// relative to recording start rather than absolute wall clock.
+    private(set) var startDate: Date?
 
     /// Tick frequency for the UI refresh loop. 20 Hz is smooth enough for a
     /// pulsing dot and a waveform without burning battery. We also set
