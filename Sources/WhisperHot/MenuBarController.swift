@@ -634,7 +634,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let url = try audioRecorder.stopRecording()
             NSLog("WhisperHot: saved → \(url.path)\(wantsRaw ? " (raw output requested)" : "")")
             configureButton(recording: false)
-            indicatorController.hide()
+            // Don't hide indicator — switch to transcribing animation.
+            // It will be hidden in finishTranscription after text is pasted.
+            indicatorController.showTranscribing()
             playChimeIfEnabled(.stop)
             kickOffTranscription(audioURL: url, wantsRawOutput: wantsRaw)
         } catch {
@@ -764,6 +766,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func finishTranscription(outcome: TranscriptionOutcome) {
         state = .idle
         recordMenuItem?.title = L10n.startRecording
+        indicatorController.hide()
         let target = recordingTarget
         recordingTarget = nil
         let lastAudioURL = currentRecordingURL

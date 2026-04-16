@@ -6,9 +6,12 @@ import Foundation
 /// fields and redraw on every tick.
 @MainActor
 final class IndicatorViewModel: ObservableObject {
+    enum Mode { case idle, recording, transcribing }
+
     @Published private(set) var rms: Float = 0
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var isActive: Bool = false
+    @Published private(set) var mode: Mode = .idle
 
     private let rmsProvider: () -> Float
     private var timer: Timer?
@@ -35,6 +38,7 @@ final class IndicatorViewModel: ObservableObject {
         rms = 0
         elapsed = 0
         isActive = true
+        mode = .recording
 
         let t = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -48,17 +52,29 @@ final class IndicatorViewModel: ObservableObject {
         timer = t
     }
 
+    /// Switch to transcribing mode: keep the panel visible with a
+    /// waiting animation but stop reading RMS from the microphone.
+    func startTranscribing() {
+        mode = .transcribing
+        rms = 0
+        // Keep timer running for elapsed time + animation
+    }
+
     func stop() {
         timer?.invalidate()
         timer = nil
         startDate = nil
         isActive = false
+        mode = .idle
         rms = 0
         elapsed = 0
     }
 
     private func tick() {
-        rms = rmsProvider()
+        if mode == .recording {
+            rms = rmsProvider()
+        }
+        // In transcribing mode rms stays 0 — the view draws a waiting animation instead
         if let startDate {
             elapsed = Date().timeIntervalSince(startDate)
         }

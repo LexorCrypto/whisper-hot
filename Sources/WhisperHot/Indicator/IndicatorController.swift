@@ -40,6 +40,12 @@ final class IndicatorController {
         panel.orderFrontRegardless()
     }
 
+    /// Switch to transcribing mode: keep panel visible with waiting animation.
+    func showTranscribing() {
+        viewModel.startTranscribing()
+        // Panel stays visible — no hide/show cycle
+    }
+
     func hide() {
         panel?.orderOut(nil)
         viewModel.stop()
