@@ -176,8 +176,9 @@ final class WhisperInstaller: ObservableObject {
             process.standardError = stderrPipe
 
             let stdoutPipe = Pipe()
-            stdoutPipe.fileHandleForReading.readabilityHandler = { _ in
-                // discard stdout but drain it
+            stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+                // Read and discard stdout to prevent pipe buffer from filling
+                _ = handle.availableData
             }
             process.standardOutput = stdoutPipe
 
@@ -238,7 +239,12 @@ final class WhisperInstaller: ObservableObject {
                     onComplete: { [weak self] error in
                         Task { @MainActor in
                             if let error {
-                                self?.status = .failed(message: error.localizedDescription)
+                                // Don't show .failed for user-initiated cancel
+                                if (error as NSError).code == NSURLErrorCancelled {
+                                    // status already set to .notInstalled by cancel()
+                                } else {
+                                    self?.status = .failed(message: error.localizedDescription)
+                                }
                                 continuation.resume(returning: false)
                             } else {
                                 continuation.resume(returning: true)
@@ -317,8 +323,8 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let error {
-            // Don't report cancel as failure
-            if (error as NSError).code == NSURLErrorCancelled { return }
+            // Always call onComplete so the continuation is resumed.
+            // The caller checks for cancel and sets .notInstalled instead of .failed.
             onComplete(error)
         }
     }

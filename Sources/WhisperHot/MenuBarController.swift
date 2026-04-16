@@ -818,7 +818,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         currentRecordingURL = nil
         switch outcome {
         case .success(let result):
-            NSLog("WhisperHot: transcript (\(result.providerModel)) → \(result.text)")
+            NSLog("WhisperHot: transcript (\(result.providerModel)) → \(result.text.count) chars")
             if case .succeeded(let model, let preset) = result.postProcessing {
                 NSLog("WhisperHot: post-processed via \(model) (\(preset))")
             }
@@ -874,7 +874,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 AudioRetentionSweeper.delete(url)
             }
         case .failure(let message):
-            NSLog("WhisperHot: transcription error → \(message)")
+            NSLog("WhisperHot: transcription error")
+            // Show error banner in menu so user knows something went wrong
+            setPostProcessingError(L10n.lang == .ru
+                ? "⚠ Ошибка транскрипции: \(message)"
+                : "⚠ Transcription error: \(message)",
+                raw: true)
             // Failure path intentionally does NOT delete the audio file:
             // leaving it gives the startup sweep (or the user) a retry
             // window. The sweep still enforces the configured max age.

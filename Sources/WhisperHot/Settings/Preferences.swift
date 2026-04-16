@@ -483,7 +483,7 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
         case .localLLM: return nil  // subprocess, no HTTP endpoint
         case .custom:
             let raw = Preferences.customEndpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !raw.isEmpty, let url = URL(string: raw), url.scheme == "https" || url.scheme == "http" else {
+            guard !raw.isEmpty, let url = URL(string: raw), url.scheme == "https" else {
                 return nil
             }
             return url

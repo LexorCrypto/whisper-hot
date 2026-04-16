@@ -82,8 +82,9 @@ enum ContextRouter {
         let result = AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focusedWindow)
         guard result == .success else { return nil }
 
-        // swiftlint:disable:next force_cast
-        let window = focusedWindow as! AXUIElement
+        // AXUIElement is a CFTypeRef; the cast always succeeds at runtime
+        // but we guard against nil focusedWindow above via .success check.
+        let window = focusedWindow as! AXUIElement  // safe: guarded by result == .success
         var titleValue: CFTypeRef?
         let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
         guard titleResult == .success, let title = titleValue as? String else { return nil }

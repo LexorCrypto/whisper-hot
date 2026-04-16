@@ -641,7 +641,7 @@ struct SettingsView: View {
             TextField("Endpoint URL", text: $customEndpointURL, prompt: Text("https://api.polza.ai/v1/chat/completions"))
                 .textFieldStyle(.roundedBorder)
             if !customEndpointURL.isEmpty, PostProcessingProvider.custom.endpoint == nil {
-                Label("Invalid URL. Must start with https:// or http://", systemImage: "exclamationmark.triangle.fill")
+                Label(L10n.lang == .ru ? "Неверный URL. Должен начинаться с https://" : "Invalid URL. Must start with https://", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundColor(.red)
             }
