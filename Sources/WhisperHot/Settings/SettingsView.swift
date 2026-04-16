@@ -59,6 +59,7 @@ struct SettingsView: View {
     @State private var customEndpointKeyStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var contextRules: [ContextRule] = Preferences.contextRules
     @StateObject private var whisperInstaller = WhisperInstaller()
+    @State private var showManualWhisperPaths = false
     @StateObject private var updateChecker = UpdateChecker()
 
     private struct StatusMessage {
@@ -372,7 +373,12 @@ struct SettingsView: View {
             }
 
             // Manual path overrides (advanced)
-            DisclosureGroup(L10n.lang == .ru ? "Ручная настройка путей" : "Manual path configuration") {
+            // Manual path configuration
+            Toggle(L10n.lang == .ru ? "Ручная настройка путей" : "Manual path configuration",
+                   isOn: $showManualWhisperPaths)
+                .font(.caption)
+
+            if showManualWhisperPaths {
                 LabeledContent(L10n.binary) {
                     HStack(spacing: 8) {
                         Text(pathDisplay(localBinaryPath))
