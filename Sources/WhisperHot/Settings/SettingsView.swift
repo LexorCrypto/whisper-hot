@@ -59,7 +59,7 @@ struct SettingsView: View {
     @State private var customEndpointKeyStatus: StatusMessage = .init(text: "", kind: .secondary)
     @State private var contextRules: [ContextRule] = Preferences.contextRules
     @StateObject private var whisperInstaller = WhisperInstaller()
-    @State private var showManualWhisperPaths = false
+    @State private var showManualWhisperPaths = !Preferences.localWhisperBinaryPath.isEmpty || !Preferences.localWhisperModelPath.isEmpty
     @StateObject private var updateChecker = UpdateChecker()
 
     private struct StatusMessage {
