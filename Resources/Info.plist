@@ -26,6 +26,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>WhisperHot records audio to transcribe your voice to text.</string>
+    <key>CFBundleIconFile</key>
+    <string>WhisperHot</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

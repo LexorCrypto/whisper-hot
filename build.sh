@@ -80,6 +80,12 @@ mkdir -p "${APP_BUNDLE}/Contents/Resources"
 ditto --noextattr "${BIN_PATH}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 ditto --noextattr Resources/Info.plist "${APP_BUNDLE}/Contents/Info.plist"
 
+# Copy app icon into the bundle if it exists.
+if [ -f "Resources/WhisperHot.icns" ]; then
+    ditto --noextattr Resources/WhisperHot.icns "${APP_BUNDLE}/Contents/Resources/WhisperHot.icns"
+    echo "  copied app icon to bundle"
+fi
+
 # Copy custom sounds into the app bundle if they exist.
 if [ -d "Resources/Sounds" ]; then
     mkdir -p "${APP_BUNDLE}/Contents/Resources/Sounds"
