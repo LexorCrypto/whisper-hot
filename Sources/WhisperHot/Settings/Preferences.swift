@@ -425,6 +425,7 @@ enum IndicatorStyle: String, CaseIterable, Identifiable {
     case pill
     case waveform
     case floatingCapsule
+    case studio
 
     var id: String { rawValue }
 
@@ -434,6 +435,7 @@ enum IndicatorStyle: String, CaseIterable, Identifiable {
         case .pill: return "Mini (pill)"
         case .waveform: return "Classic (waveform)"
         case .floatingCapsule: return "Floating capsule (premium)"
+        case .studio: return "Studio (wide panel)"
         }
     }
 }

@@ -90,6 +90,8 @@ final class IndicatorController {
             root = AnyView(ClassicWaveformView(viewModel: viewModel))
         case .floatingCapsule:
             root = AnyView(FloatingCapsuleView(viewModel: viewModel))
+        case .studio:
+            root = AnyView(StudioPanelView(viewModel: viewModel))
         case .menubar:
             root = AnyView(EmptyView())
         }

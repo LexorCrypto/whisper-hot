@@ -143,6 +143,7 @@ enum L10n {
         case .pill: return lang == .ru ? "Мини (пилюля)" : "Mini (pill)"
         case .waveform: return lang == .ru ? "Классика (волна)" : "Classic (waveform)"
         case .floatingCapsule: return lang == .ru ? "Плавающая капсула (premium)" : "Floating capsule (premium)"
+        case .studio: return lang == .ru ? "Студия (широкая панель)" : "Studio (wide panel)"
         }
     }
 }
