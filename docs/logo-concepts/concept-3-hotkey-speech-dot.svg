@@ -1,0 +1,41 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <path fill="currentColor" fill-rule="evenodd" d="
+    M32 10
+    C19 10 9 18 9 30
+    c0 8 5 15 13 18
+    l-1 8
+    c0 2 2 3 4 2
+    l8-6
+    c13 0 22-8 22-20
+    C55 18 45 10 32 10
+    z
+
+    M32 19
+    c-3 0-5 2-5 5
+    v10
+    c0 3 2 5 5 5
+    s5-2 5-5
+    V24
+    c0-3-2-5-5-5
+    z
+
+    M21 31
+    h4
+    v3
+    c0 4 3 8 7 8
+    s7-4 7-8
+    v-3
+    h4
+    v3
+    c0 6-4 11-10 12
+    v4
+    h6
+    v3
+    H25
+    v-3
+    h6
+    v-4
+    c-6-1-10-6-10-12
+    z"/>
+  <circle cx="51" cy="14" r="5" fill="#FF5A1F"/>
+</svg>
