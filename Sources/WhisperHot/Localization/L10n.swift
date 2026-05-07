@@ -109,6 +109,7 @@ enum L10n {
     static var about: String { lang == .ru ? "О WhisperHot" : "About WhisperHot" }
     static var permissions: String { lang == .ru ? "Разрешения и настройка…" : "Permissions & Onboarding…" }
     static var quit: String { lang == .ru ? "Завершить WhisperHot" : "Quit WhisperHot" }
+    static var autoOfflineOnTimeout: String { lang == .ru ? "Авто-переключение на Offline при медленной сети" : "Auto-switch to Offline when slow" }
 
     // MARK: - Provider descriptions
     static func providerDescription(for p: TranscriptionProvider) -> String {

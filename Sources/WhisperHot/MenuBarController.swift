@@ -35,6 +35,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// `.state` on each entry (checkmark) when the active provider
     /// changes, so the user sees the current choice at a glance.
     private var providerSubmenu: NSMenu?
+    private var autoOfflineOnTimeoutMenuItem: NSMenuItem?
     private var state: RecorderState = .idle
     private var isStartingRecording = false
     /// The app that was frontmost when recording started. Used by PasteService
@@ -360,6 +361,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(providerParent)
         self.providerSubmenu = providerMenu
 
+        // --- Auto-offline-on-timeout toggle (ADR-014) ---
+        let autoOfflineItem = NSMenuItem(
+            title: L10n.autoOfflineOnTimeout,
+            action: #selector(toggleAutoOfflineOnTimeout(_:)),
+            keyEquivalent: ""
+        )
+        autoOfflineItem.target = self
+        menu.addItem(autoOfflineItem)
+        self.autoOfflineOnTimeoutMenuItem = autoOfflineItem
+
         menu.addItem(.separator())
 
         // --- Windows & commands ---
@@ -450,6 +461,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     item.title = L10n.permissions
                 } else if item.action == #selector(showAbout(_:)) {
                     item.title = L10n.about
+                } else if item.action == #selector(toggleAutoOfflineOnTimeout(_:)) {
+                    item.title = L10n.autoOfflineOnTimeout
                 } else if item.action == #selector(quit(_:)) {
                     item.title = L10n.quit
                 } else if item.submenu != nil && item.action == nil {
@@ -505,6 +518,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let match = (item.representedObject as? String) == activeRaw
             item.state = match ? .on : .off
         }
+
+        autoOfflineOnTimeoutMenuItem?.state = Preferences.autoOfflineOnTimeout ? .on : .off
     }
 
     // MARK: - Actions
@@ -776,6 +791,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         if picked == Preferences.provider { return }
         UserDefaults.standard.set(picked.rawValue, forKey: Preferences.Key.provider)
+    }
+
+    @objc private func toggleAutoOfflineOnTimeout(_ sender: Any?) {
+        let next = !Preferences.autoOfflineOnTimeout
+        UserDefaults.standard.set(next, forKey: Preferences.Key.autoOfflineOnTimeout)
+        autoOfflineOnTimeoutMenuItem?.state = next ? .on : .off
     }
 
     @objc private func showAbout(_ sender: Any?) {

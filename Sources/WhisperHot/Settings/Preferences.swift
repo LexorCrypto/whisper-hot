@@ -39,6 +39,8 @@ public enum Preferences {
         static let vocabularyHints = "WhisperHot.vocabularyHints"
         static let wordReplacements = "WhisperHot.wordReplacements"
         static let appLanguage = "WhisperHot.appLanguage"
+        static let autoOfflineOnTimeout = "WhisperHot.autoOfflineOnTimeout"
+        static let autoOfflineTimeoutSeconds = "WhisperHot.autoOfflineTimeoutSeconds"
     }
 
     enum Defaults {
@@ -70,6 +72,8 @@ public enum Preferences {
         static let postProcessingModelGroq = "llama-3.1-8b-instant"
         static let customEndpointURL = ""
         static let customEndpointModel = ""
+        static let autoOfflineOnTimeout = false
+        static let autoOfflineTimeoutSeconds = 10
     }
 
     /// Register baseline defaults so first-run reads return sensible values
@@ -102,7 +106,9 @@ public enum Preferences {
             Key.postProcessingModelOpenAI: Defaults.postProcessingModelOpenAI,
             Key.postProcessingModelGroq: Defaults.postProcessingModelGroq,
             Key.customEndpointURL: Defaults.customEndpointURL,
-            Key.customEndpointModel: Defaults.customEndpointModel
+            Key.customEndpointModel: Defaults.customEndpointModel,
+            Key.autoOfflineOnTimeout: Defaults.autoOfflineOnTimeout,
+            Key.autoOfflineTimeoutSeconds: Defaults.autoOfflineTimeoutSeconds
         ])
     }
 
@@ -329,6 +335,17 @@ public enum Preferences {
 
     static var contextRoutingEnabled: Bool {
         UserDefaults.standard.bool(forKey: Key.contextRoutingEnabled)
+    }
+
+    // MARK: - Auto-offline on timeout
+
+    static var autoOfflineOnTimeout: Bool {
+        UserDefaults.standard.bool(forKey: Key.autoOfflineOnTimeout)
+    }
+
+    static var autoOfflineTimeoutSeconds: Int {
+        let raw = UserDefaults.standard.integer(forKey: Key.autoOfflineTimeoutSeconds)
+        return raw > 0 ? raw : Defaults.autoOfflineTimeoutSeconds
     }
 
     /// The user's context routing rules, decoded from JSON in UserDefaults.

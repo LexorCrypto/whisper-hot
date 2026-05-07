@@ -243,6 +243,44 @@
 
 ---
 
+## ADR-014 — Timeout fallback только opt-in: slow cloud → local whisper по таймауту
+
+**Контекст.** ADR-013 вернул строгую политику fallback: auth/HTTP/server ошибки не должны тихо подменять провайдера. Но есть другой UX-кейс: пользователь с рабочим API-ключом сидит на плохой сети, cloud STT висит долго (10+ секунд), а локальный whisper.cpp уже настроен. Это не auth-error и не server-error — это latency problem, и пользователю выгоднее получить чуть менее точный, но быстрый результат.
+
+**Решение.** Добавлен opt-in флаг `Preferences.autoOfflineOnTimeout` (default `false`) и параметр `autoOfflineTimeoutSeconds` (default 10). Когда флаг включён И local whisper.cpp доступен, `FallbackTranscriptionService` race-ит primary против таймера через `withThrowingTaskGroup`. Local fallback запускается **последовательно**, только после того как race резолвится с `.timeout` или `.primaryFailure(offline)`:
+- если primary успел до timeout — возвращается primary, local subprocess вообще не запускается;
+- если timeout наступил первым — primary URLSession отменяется, СТАРТУЕТ local whisper, его результат возвращается с `usedOfflineFallback = true`;
+- если primary упал с offline-ошибкой до timeout — поведение как до ADR-014;
+- если local fallback не настроен — флаг игнорируется, ждём primary до конца.
+
+Тоггл живёт в menu bar меню рядом с Provider submenu, чтобы пользователь мог быстро включить/выключить при смене сети.
+
+**Обоснование.**
+- Это осознанный latency fallback, а не silent masking auth/HTTP failures — пользователь сам включает поведение и понимает возможную смену качества/модели.
+- `usedOfflineFallback = true` сохраняет существующий контракт: UI показывает баннер, post-processing пропускается.
+- 10 секунд по умолчанию — порог, при котором cloud-провайдер с большой вероятностью реально завис, а не просто медленный.
+- HTTP 401/403/5xx по-прежнему НЕ fallback'ятся: при non-offline primary-ошибке бросаем явно — ADR-013 остаётся валиден.
+- **Последовательный, а не параллельный fallback.** Первая редакция запускала local whisper параллельно с primary. Codex review поймал баг: `LocalWhisperProvider` оборачивает `Process` в continuation, который НЕ реагирует на `Task.cancel()`. Поэтому при быстром cloud-успехе `withThrowingTaskGroup` всё равно ждал бы полного завершения локального subprocess'а перед возвратом результата. Архитектурный фикс — не запускать local до решения race'а.
+
+**Последствия.**
+- Fast path (cloud<10s): нулевой overhead, local whisper не стартует.
+- Slow path (cloud>10s): user ждёт 10s + время local whisper. Принято.
+- Cancellation primary-задачи кооперативная: `URLSession.dataTask` отменяется по `Task.cancel()`. Subprocess local fallback не запускается до race-резолва, поэтому проблемы не возникает.
+- Под Swift 6 strict concurrency enum `RaceEvent` с `Error` cases может потребовать boxing. На 5.9 mode компилируется без warnings.
+
+**Альтернативы.**
+- *Treat `.timedOut` URLError as offline by default.* Отвергнуто: slow provider ≠ offline для всех пользователей.
+- *NWPathMonitor-only fallback.* Не решает captive portal / packet loss / slow upload — только полное отсутствие сети.
+- *Последовательный retry после timeout.* Хуже UX: пользователь ждёт timeout, потом ещё полный local whisper transcription.
+
+**Tradeoff с ADR-013 (известный, документированный).** Когда timer срабатывает раньше, чем primary успел вернуть HTTP-ошибку (401/403/5xx), эта ошибка маскируется local-результатом. Codex review поймал это как нарушение ADR-013. Принято осознанно: пользователь явно включил тоггл «switch to local if slow», его mental model — "I don't care WHY cloud is slow, give me local". Banner `usedOfflineFallback` показывает, что переключение произошло — это visible сигнал, что cloud-результат не получен. На практике auth-ошибки возвращаются быстро (1-2s) и редко доживают до timeout. Полный фикс требовал бы либо cancellation-aware `LocalWhisperProvider` (отдельная задача), либо grace-period после timeout — оба расширяют scope. Решение: документировать как opt-in tradeoff, не блокировать релиз.
+
+**Гард для local-primary.** Если пользователь выбрал `provider == .localWhisper`, тоггл игнорируется — иначе timer на медленной локальной транскрипции запустит дубликат той же local-задачи. Гард в `TranscriptionCoordinator.fromPreferences`: `timeoutRaceEligible = provider != .localWhisper && Preferences.autoOfflineOnTimeout`.
+
+**Не Supersedes ADR-013.** ADR-013 запрещает silent fallback на auth/HTTP по умолчанию. ADR-014 разрешает opt-in fallback на latency, с явным acknowledgement что timeout-окно может частично перекрыть auth/HTTP-окно. Разные классы ошибок, разные политики, явный пользовательский opt-in.
+
+---
+
 ## Про будущее (pending / не принято)
 
 - **Streaming транскрипция.** Plan в `docs/streaming-plan.md`. Deepgram/AssemblyAI ~$8/мес. Отложено — batch с Groq (0.5 сек, $0.90/мес) достаточен.

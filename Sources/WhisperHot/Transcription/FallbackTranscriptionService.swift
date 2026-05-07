@@ -6,21 +6,41 @@ import Foundation
 ///
 ///   Cloud provider ──[network error]──► Local whisper.cpp
 ///
-/// Only triggers on definitive offline errors (notConnectedToInternet,
-/// networkConnectionLost). Does NOT trigger on timeouts (slow provider ≠ offline).
+/// By default, only triggers on definitive offline errors
+/// (notConnectedToInternet, networkConnectionLost) — see ADR-013.
+/// If `autoOfflineOnTimeout` is enabled in Preferences, also races primary
+/// against a timer (NOT against a concurrent local subprocess) and switches
+/// to local whisper.cpp after the configured timeout (ADR-014).
+/// 401/403/5xx still do NOT trigger fallback regardless of the toggle.
 final class FallbackTranscriptionService: TranscriptionService {
     private let primary: TranscriptionService
     private let fallback: TranscriptionService?
+    private let autoOfflineOnTimeout: Bool
+    private let autoOfflineTimeoutSeconds: Int
 
-    init(primary: TranscriptionService, fallback: TranscriptionService?) {
+    init(
+        primary: TranscriptionService,
+        fallback: TranscriptionService?,
+        autoOfflineOnTimeout: Bool = false,
+        autoOfflineTimeoutSeconds: Int = 10
+    ) {
         self.primary = primary
         self.fallback = fallback
+        self.autoOfflineOnTimeout = autoOfflineOnTimeout
+        self.autoOfflineTimeoutSeconds = max(1, autoOfflineTimeoutSeconds)
     }
 
     func transcribe(audioURL: URL, options: TranscriptionOptions) async throws -> TranscriptionResult {
+        if autoOfflineOnTimeout, let fallback {
+            return try await transcribeWithTimeoutRace(
+                audioURL: audioURL,
+                options: options,
+                fallback: fallback
+            )
+        }
+
         do {
-            let result = try await primary.transcribe(audioURL: audioURL, options: options)
-            return result
+            return try await primary.transcribe(audioURL: audioURL, options: options)
         } catch {
             guard let fallback, isOfflineError(error) else {
                 throw error
@@ -29,24 +49,87 @@ final class FallbackTranscriptionService: TranscriptionService {
             NSLog("WhisperHot: primary provider offline, falling back to local whisper")
 
             let localResult = try await fallback.transcribe(audioURL: audioURL, options: options)
-
-            // Mark the result as coming from offline fallback so the caller
-            // can skip post-processing and show an appropriate banner.
-            return TranscriptionResult(
-                text: localResult.text,
-                providerModel: localResult.providerModel,
-                postProcessing: localResult.postProcessing,
-                usedOfflineFallback: true
-            )
+            return markedOfflineFallback(localResult)
         }
     }
 
+    // MARK: - Race implementation
+    //
+    // Race primary against a timer ONLY. The local fallback is started
+    // sequentially AFTER the race resolves with .timeout or .primaryFailure
+    // (offline). This avoids waiting on `LocalWhisperProvider`'s subprocess
+    // — which does not observe Task cancellation — when primary wins fast.
+
+    private enum RaceEvent {
+        case primarySuccess(TranscriptionResult)
+        case primaryFailure(Error)
+        case timeout
+    }
+
+    private func transcribeWithTimeoutRace(
+        audioURL: URL,
+        options: TranscriptionOptions,
+        fallback: TranscriptionService
+    ) async throws -> TranscriptionResult {
+        let timeoutNanoseconds = UInt64(autoOfflineTimeoutSeconds) * 1_000_000_000
+        let primary = self.primary
+
+        let raceResult: RaceEvent = try await withThrowingTaskGroup(of: RaceEvent.self) { group in
+            group.addTask {
+                do {
+                    let result = try await primary.transcribe(audioURL: audioURL, options: options)
+                    return .primarySuccess(result)
+                } catch {
+                    return .primaryFailure(error)
+                }
+            }
+
+            group.addTask {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                return .timeout
+            }
+
+            guard let first = try await group.next() else {
+                throw TranscriptionError.invalidResponse
+            }
+            group.cancelAll()
+            return first
+        }
+
+        switch raceResult {
+        case .primarySuccess(let result):
+            return result
+
+        case .primaryFailure(let error):
+            if isOfflineError(error) {
+                NSLog("WhisperHot: primary provider offline, falling back to local whisper")
+                let localResult = try await fallback.transcribe(audioURL: audioURL, options: options)
+                return markedOfflineFallback(localResult)
+            }
+            throw error
+
+        case .timeout:
+            NSLog("WhisperHot: primary provider timed out after \(autoOfflineTimeoutSeconds)s, switching to local whisper")
+            let localResult = try await fallback.transcribe(audioURL: audioURL, options: options)
+            return markedOfflineFallback(localResult)
+        }
+    }
+
+    private func markedOfflineFallback(_ result: TranscriptionResult) -> TranscriptionResult {
+        TranscriptionResult(
+            text: result.text,
+            providerModel: result.providerModel,
+            postProcessing: result.postProcessing,
+            usedOfflineFallback: true
+        )
+    }
+
+    // MARK: - Offline error detection
+
     private func isOfflineError(_ error: Error) -> Bool {
-        // Check TranscriptionError.networkFailure wrapping a URLError
         if case TranscriptionError.networkFailure(let underlying) = error {
             return isOfflineURLError(underlying)
         }
-        // Direct URLError
         return isOfflineURLError(error)
     }
 

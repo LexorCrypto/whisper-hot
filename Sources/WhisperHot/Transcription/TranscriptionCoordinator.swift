@@ -97,9 +97,16 @@ struct TranscriptionCoordinator: Sendable {
     ) -> TranscriptionCoordinator {
         let primaryService = makeTranscriptionService(for: provider)
         let localFallback = makeLocalFallbackIfReady()
+        // Timeout race only makes sense when primary is a cloud provider.
+        // If the user explicitly selected local whisper as primary, the
+        // timer would just fire on slow local transcriptions and start a
+        // duplicate local subprocess on the same audio. ADR-014 §Последствия.
+        let timeoutRaceEligible = provider != .localWhisper && Preferences.autoOfflineOnTimeout
         let service: TranscriptionService = FallbackTranscriptionService(
             primary: primaryService,
-            fallback: localFallback
+            fallback: localFallback,
+            autoOfflineOnTimeout: timeoutRaceEligible,
+            autoOfflineTimeoutSeconds: Preferences.autoOfflineTimeoutSeconds
         )
 
         let skipPostProcessing = wantsRawOutput || !Preferences.postProcessingEnabled
