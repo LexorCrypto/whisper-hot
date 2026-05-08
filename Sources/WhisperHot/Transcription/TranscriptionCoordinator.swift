@@ -119,12 +119,15 @@ struct TranscriptionCoordinator: Sendable {
             postProcessor = nil
             localLLMProcessor = nil
         } else if ppProvider == .localLLM {
+            // Always construct the processor; let process() surface the
+            // missingLocalBinary / missingLocalModel errors at run time so
+            // the user sees a meaningful banner instead of silent skipping
+            // when paths are empty.
             postProcessor = nil
-            let bin = Preferences.localLLMBinaryPath
-            let model = Preferences.localLLMModelPath
-            localLLMProcessor = (!bin.isEmpty && !model.isEmpty)
-                ? LocalLLMProcessor(binaryPath: bin, modelPath: model)
-                : nil
+            localLLMProcessor = LocalLLMProcessor(
+                binaryPath: Preferences.localLLMBinaryPath,
+                modelPath: Preferences.localLLMModelPath
+            )
         } else if let endpoint = ppProvider.endpoint, let account = ppProvider.keychainAccount {
             postProcessor = LLMPostProcessor(
                 endpoint: endpoint,

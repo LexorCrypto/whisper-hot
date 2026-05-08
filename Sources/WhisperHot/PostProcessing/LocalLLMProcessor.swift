@@ -19,11 +19,19 @@ final class LocalLLMProcessor: @unchecked Sendable {
     /// preset's system prompt + user text, runs llama-cli, returns
     /// the cleaned text.
     func process(text: String, options: PostProcessingOptions) async throws -> String {
-        guard FileManager.default.isExecutableFile(atPath: binaryPath) else {
-            throw PostProcessingError.missingAPIKey // reuse error type
+        // Validate against the same expanded paths runLlama() will execute,
+        // otherwise a user-typed "~/models/foo.gguf" (which Settings even
+        // suggests as the example placeholder) would fail validation while
+        // being perfectly valid at execution time.
+        let expandedBinary = (binaryPath as NSString).expandingTildeInPath
+        let expandedModel = (modelPath as NSString).expandingTildeInPath
+        guard !binaryPath.isEmpty,
+              FileManager.default.isExecutableFile(atPath: expandedBinary) else {
+            throw PostProcessingError.missingLocalBinary(path: binaryPath)
         }
-        guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw PostProcessingError.missingAPIKey
+        guard !modelPath.isEmpty,
+              FileManager.default.fileExists(atPath: expandedModel) else {
+            throw PostProcessingError.missingLocalModel(path: modelPath)
         }
 
         let systemPrompt = options.preset.systemPrompt(custom: options.customPrompt)

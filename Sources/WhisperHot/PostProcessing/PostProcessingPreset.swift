@@ -61,6 +61,8 @@ struct PostProcessingOptions: Sendable, Equatable {
 
 enum PostProcessingError: LocalizedError {
     case missingAPIKey
+    case missingLocalBinary(path: String)
+    case missingLocalModel(path: String)
     case networkFailure(underlying: Error)
     case httpError(status: Int, body: String)
     case invalidResponse
@@ -70,6 +72,16 @@ enum PostProcessingError: LocalizedError {
         switch self {
         case .missingAPIKey:
             return "API key is not set for the post-processing provider. Open Settings and save a key."
+        case .missingLocalBinary(let path):
+            if path.isEmpty {
+                return "Local LLM binary path is not set. Open Settings → Post-processing → Local LLM and point it at your llama-cli."
+            }
+            return "Local LLM binary not found or not executable at \(path)."
+        case .missingLocalModel(let path):
+            if path.isEmpty {
+                return "Local LLM model path is not set. Open Settings → Post-processing → Local LLM and point it at your GGUF model."
+            }
+            return "Local LLM model file not found at \(path)."
         case .networkFailure(let err):
             return "Post-processing network error: \(err.localizedDescription)"
         case .httpError(let status, let body):
