@@ -178,6 +178,19 @@ public enum Preferences {
         UserDefaults.standard.string(forKey: Key.localWhisperModelPath) ?? Defaults.localWhisperModelPath
     }
 
+    /// Local whisper.cpp is usable when both binary and model paths are
+    /// configured AND exist on disk. Single source of truth for this check —
+    /// MenuBarController uses it to gate the auto-offline toggle, and
+    /// TranscriptionCoordinator uses it to decide whether to construct a
+    /// local fallback service.
+    static var isLocalWhisperReady: Bool {
+        let bin = localWhisperBinaryPath
+        let model = localWhisperModelPath
+        guard !bin.isEmpty, !model.isEmpty else { return false }
+        return FileManager.default.isExecutableFile(atPath: bin)
+            && FileManager.default.fileExists(atPath: model)
+    }
+
     /// Returns the model string for the currently-selected provider.
     /// For local whisper this is the model file's basename, computed by
     /// the provider itself at transcription time.

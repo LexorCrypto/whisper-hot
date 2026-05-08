@@ -196,13 +196,10 @@ struct TranscriptionCoordinator: Sendable {
     }
 
     private static func makeLocalFallbackIfReady() -> TranscriptionService? {
-        let bin = Preferences.localWhisperBinaryPath
-        let model = Preferences.localWhisperModelPath
-        guard !bin.isEmpty, !model.isEmpty,
-              FileManager.default.isExecutableFile(atPath: bin),
-              FileManager.default.fileExists(atPath: model) else {
-            return nil
-        }
-        return LocalWhisperProvider(binaryPath: bin, modelPath: model)
+        guard Preferences.isLocalWhisperReady else { return nil }
+        return LocalWhisperProvider(
+            binaryPath: Preferences.localWhisperBinaryPath,
+            modelPath: Preferences.localWhisperModelPath
+        )
     }
 }

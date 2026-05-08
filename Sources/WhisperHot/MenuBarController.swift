@@ -522,7 +522,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // Auto-offline toggle: disable when local whisper.cpp isn't configured.
         // Without a local fallback, the toggle would silently no-op (the
         // FallbackTranscriptionService gates the timeout race on `let fallback`).
-        let localReady = isLocalWhisperReady()
+        let localReady = Preferences.isLocalWhisperReady
         if let item = autoOfflineOnTimeoutMenuItem {
             item.isEnabled = localReady
             item.state = (localReady && Preferences.autoOfflineOnTimeout) ? .on : .off
@@ -532,16 +532,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     ? "Сначала настрой Local whisper.cpp в Settings → Providers"
                     : "Set up Local whisper.cpp in Settings → Providers first")
         }
-    }
-
-    /// Mirrors TranscriptionCoordinator.makeLocalFallbackIfReady() — local whisper
-    /// is usable when both binary and model paths are configured AND exist on disk.
-    private func isLocalWhisperReady() -> Bool {
-        let bin = Preferences.localWhisperBinaryPath
-        let model = Preferences.localWhisperModelPath
-        guard !bin.isEmpty, !model.isEmpty else { return false }
-        return FileManager.default.isExecutableFile(atPath: bin)
-            && FileManager.default.fileExists(atPath: model)
     }
 
     // MARK: - Actions
