@@ -425,16 +425,6 @@ enum AudioRetention: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var displayName: String {
-        switch self {
-        case .immediate: return "Delete immediately after transcription (recommended)"
-        case .oneHour: return "Keep for 1 hour"
-        case .oneDay: return "Keep for 24 hours"
-        case .untilQuit: return "Keep until WhisperHot quits (best-effort; skipped on force-quit / crash)"
-        case .forever: return "Keep forever"
-        }
-    }
-
     /// Max age for startup sweep. `nil` means "no age-based sweep" —
     /// either nothing to do (forever) or handled at quit (untilQuit).
     var sweepMaxAgeSeconds: TimeInterval? {
@@ -458,16 +448,6 @@ enum IndicatorStyle: String, CaseIterable, Identifiable {
     case studio
 
     var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .menubar: return "Menubar only"
-        case .pill: return "Mini (pill)"
-        case .waveform: return "Classic (waveform)"
-        case .floatingCapsule: return "Floating capsule (premium)"
-        case .studio: return "Studio (wide panel)"
-        }
-    }
 }
 
 /// The LLM provider used for post-processing (text cleanup, context routing).

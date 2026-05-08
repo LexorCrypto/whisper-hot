@@ -202,7 +202,7 @@ struct SettingsView: View {
             Section(L10n.indicator) {
                 Picker(L10n.style, selection: $indicatorStyle) {
                     ForEach(IndicatorStyle.allCases) { style in
-                        Text(style.displayName).tag(style)
+                        Text(L10n.indicatorStyleName(style)).tag(style)
                     }
                 }
                 .pickerStyle(.radioGroup)
@@ -760,7 +760,7 @@ struct SettingsView: View {
             Section(L10n.audioRetention) {
                 Picker(L10n.keepRecordings, selection: $audioRetention) {
                     ForEach(AudioRetention.allCases) { r in
-                        Text(r.displayName).tag(r)
+                        Text(L10n.audioRetentionName(r)).tag(r)
                     }
                 }
                 Button(L10n.wipeAllAudio) {

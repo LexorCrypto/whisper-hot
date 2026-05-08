@@ -147,4 +147,24 @@ enum L10n {
         case .studio: return lang == .ru ? "Студия (широкая панель)" : "Studio (wide panel)"
         }
     }
+
+    // MARK: - Audio retention policies
+    static func audioRetentionName(_ r: AudioRetention) -> String {
+        switch r {
+        case .immediate:
+            return lang == .ru
+                ? "Удалять сразу после транскрипции (рекомендуется)"
+                : "Delete immediately after transcription (recommended)"
+        case .oneHour:
+            return lang == .ru ? "Хранить 1 час" : "Keep for 1 hour"
+        case .oneDay:
+            return lang == .ru ? "Хранить 24 часа" : "Keep for 24 hours"
+        case .untilQuit:
+            return lang == .ru
+                ? "Хранить до выхода из WhisperHot (по возможности; не сработает при принудительном завершении или сбое)"
+                : "Keep until WhisperHot quits (best-effort; skipped on force-quit / crash)"
+        case .forever:
+            return lang == .ru ? "Хранить бессрочно" : "Keep forever"
+        }
+    }
 }
