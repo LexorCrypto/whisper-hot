@@ -2,6 +2,56 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.6.6] — 2026-05-08
+
+### Для пользователей
+
+- **Авто-переключение на Offline при медленной сети** (опционально).
+  Новый тоггл в menu bar рядом с Provider submenu. Когда включён, при
+  таймауте cloud-провайдера (10 секунд по умолчанию) WhisperHot
+  отменяет cloud-запрос и догоняет локальной транскрипцией через
+  whisper.cpp. Существующее поведение fallback'а на полностью offline
+  ошибки (отсутствие сети, разрыв соединения) сохранено и работает
+  независимо от тоггла. По умолчанию выключено — включается только
+  если у тебя настроен local whisper.cpp И ты явно поставил галочку.
+- **Новая иконка приложения.** Voice → Text waveform — слева
+  вертикальная аудиоволна, справа три текстовых строки, между ними
+  стрелка трансформации. Видна в Dock, Finder, Cmd-Tab switcher,
+  About panel. Иконка в menu bar остаётся системным mic-глифом
+  (один штрих, чище читается на 16-18px).
+
+### Для разработчиков
+
+- `FallbackTranscriptionService` теперь принимает два новых параметра:
+  `autoOfflineOnTimeout: Bool` и `autoOfflineTimeoutSeconds: Int`.
+  Когда флаг включён, primary-провайдер race-ится против таймера
+  через `withThrowingTaskGroup`. Local fallback стартует
+  ПОСЛЕДОВАТЕЛЬНО только после `.timeout` или `.primaryFailure(offline)` —
+  это обходит то, что `LocalWhisperProvider`'s `Process` continuation
+  не реагирует на `Task.cancel()` и иначе блокировал бы возврат
+  primary-результата.
+- Гард в `TranscriptionCoordinator.fromPreferences`: если provider
+  уже `.localWhisper`, тоггл игнорируется (иначе timer на медленной
+  локальной транскрипции запустил бы дубликат той же задачи).
+- ADR-014 в `decisions.md` с явным acknowledgement tradeoff с ADR-013:
+  при включённом тоггле cloud auth/server ошибки (401/403/5xx),
+  пришедшие после таймаута, маскируются local-результатом. Принято
+  как opt-in компромисс — пользователь сам включил поведение, banner
+  `usedOfflineFallback` показывает что переключение произошло.
+- 4 новых unit-теста в `FallbackTranscriptionServiceTests.swift`:
+  timeout race, primary wins fast, non-offline failure preserves
+  error, toggle-off legacy behavior.
+- `Preferences.autoOfflineOnTimeout` (Bool, default false) и
+  `Preferences.autoOfflineTimeoutSeconds` (Int, default 10).
+- L10n строки `autoOfflineOnTimeout` (RU/EN).
+- `scripts/make-icns.sh` — конвертит 1024×1024 PNG в `.icns` через
+  `sips` + `iconutil`.
+- `docs/logo-concepts/` — design exploration: 6 концептов через
+  Codex CLI image_generation, chroma-key cleanup через Pillow,
+  showcase HTML на разных размерах + menubar mockup.
+- `ARCHITECTURE.md` — фикс stale записи о Settings (был
+  «SwiftUI TabView», стал `NavigationSplitView` с 0.4.0).
+
 ## [0.6.5] — 2026-04-20
 
 ### Для пользователей
