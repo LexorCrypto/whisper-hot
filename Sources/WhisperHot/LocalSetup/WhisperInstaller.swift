@@ -1,23 +1,5 @@
 import Foundation
 
-/// Thread-safe byte accumulator for pipe drain handlers.
-private final class DataBuffer: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage = Data()
-
-    func append(_ chunk: Data) {
-        lock.lock()
-        defer { lock.unlock() }
-        storage.append(chunk)
-    }
-
-    func snapshot() -> Data {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage
-    }
-}
-
 /// Manages one-click installation of whisper.cpp binary (via Homebrew)
 /// and GGML model download (from HuggingFace).
 ///
