@@ -169,7 +169,7 @@ struct TranscriptionCoordinator: Sendable {
         switch provider {
         case .openai:
             return OpenAICompatibleSTTProvider(
-                endpoint: URL(string: "https://api.openai.com/v1/audio/transcriptions")!,
+                endpoint: Endpoints.OpenAI.stt,
                 model: Preferences.modelOpenAI,
                 apiKeyProvider: { try Keychain.readAPIKey(account: .openAI) }
             )
@@ -180,13 +180,13 @@ struct TranscriptionCoordinator: Sendable {
             )
         case .groq:
             return OpenAICompatibleSTTProvider(
-                endpoint: URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!,
+                endpoint: Endpoints.Groq.stt,
                 model: Preferences.modelGroq,
                 apiKeyProvider: { try Keychain.readAPIKey(account: .groq) }
             )
         case .polzaAI:
             return OpenAICompatibleSTTProvider(
-                endpoint: URL(string: "https://polza.ai/api/v1/audio/transcriptions")!,
+                endpoint: Endpoints.PolzaAI.stt,
                 model: Preferences.modelOpenAI,
                 apiKeyProvider: { try Keychain.readAPIKey(account: .polzaAI) }
             )

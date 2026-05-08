@@ -496,10 +496,10 @@ enum PostProcessingProvider: String, CaseIterable, Identifiable {
     /// Callers must handle nil by skipping post-processing or showing an error.
     var endpoint: URL? {
         switch self {
-        case .openRouter: return URL(string: "https://openrouter.ai/api/v1/chat/completions")!
-        case .openAI: return URL(string: "https://api.openai.com/v1/chat/completions")!
-        case .groq: return URL(string: "https://api.groq.com/openai/v1/chat/completions")!
-        case .polzaAI: return URL(string: "https://polza.ai/api/v1/chat/completions")!
+        case .openRouter: return Endpoints.OpenRouter.chat
+        case .openAI: return Endpoints.OpenAI.chat
+        case .groq: return Endpoints.Groq.chat
+        case .polzaAI: return Endpoints.PolzaAI.chat
         case .localLLM: return nil  // subprocess, no HTTP endpoint
         case .custom:
             let raw = Preferences.customEndpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -559,6 +559,19 @@ enum TranscriptionProvider: String, CaseIterable, Identifiable {
         case .openRouter: return .openRouter
         case .groq: return .groq
         case .polzaAI: return .polzaAI
+        case .localWhisper: return nil
+        }
+    }
+
+    /// HTTP endpoint for cloud STT providers, nil for the local subprocess
+    /// case. OpenRouter routes audio through /chat/completions instead of
+    /// a dedicated /audio/transcriptions endpoint.
+    var sttEndpoint: URL? {
+        switch self {
+        case .openai: return Endpoints.OpenAI.stt
+        case .openRouter: return Endpoints.OpenRouter.stt
+        case .groq: return Endpoints.Groq.stt
+        case .polzaAI: return Endpoints.PolzaAI.stt
         case .localWhisper: return nil
         }
     }

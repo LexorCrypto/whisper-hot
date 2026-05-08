@@ -10,7 +10,7 @@ import Foundation
 /// behave like a transcriber. Works because the updated plan confirms
 /// OpenRouter supports audio input on compatible models.
 final class OpenRouterAudioProvider: TranscriptionService {
-    private let endpoint = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+    private let endpoint = Endpoints.OpenRouter.chat
     /// OpenRouter does not publish an explicit chat-completions payload
     /// ceiling, but returns `413 Content Too Large` on oversized requests.
     /// Cap raw WAV bytes conservatively so we never ship anything the
