@@ -52,6 +52,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// finishTranscription can delete it per the audio retention policy.
     private var currentRecordingURL: URL?
 
+    /// The in-flight transcription Task, if any. Stored so sleep/wake or a
+    /// new recording start can cancel a stranded request (e.g. URLSession
+    /// stuck on a dead socket after macOS wakes from sleep). Cleared when
+    /// the result is delivered or discarded as stale.
+    private var transcriptionTask: Task<Void, Never>?
+
+    /// Monotonic counter incremented each time a new transcription is
+    /// kicked off. The Task's continuation passes back the epoch it was
+    /// launched under; if it no longer matches by the time the result
+    /// arrives, the result is from a cancelled / superseded run and is
+    /// dropped instead of being routed through finishTranscription (which
+    /// would otherwise reset state mid-new-recording).
+    private var transcriptionEpoch: UInt64 = 0
+
     /// Sticky banner at the top of the status menu that surfaces the last
     /// post-processing error without stealing focus. Cleared on: any new
     /// recording start, a successful transcription, or a run with
@@ -702,6 +716,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func kickOffTranscription(audioURL: URL, wantsRawOutput: Bool = false) {
+        // Defensive: cancel a stranded prior task before launching a new one.
+        // The state-machine guards against re-entry while .transcribing, but
+        // sleep/wake and future code paths may bypass that guard.
+        transcriptionTask?.cancel()
+        transcriptionEpoch &+= 1
+        let myEpoch = transcriptionEpoch
+
         state = .transcribing
         recordMenuItem?.title = L10n.transcribing
 
@@ -721,8 +742,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             options.prompt = hints
         }
 
-        NSLog("WhisperHot: transcription task launching (provider=\(Preferences.provider.rawValue))")
-        Task.detached(priority: .userInitiated) { [weak self] in
+        NSLog("WhisperHot: transcription task launching (epoch=\(myEpoch), provider=\(Preferences.provider.rawValue))")
+        transcriptionTask = Task.detached(priority: .userInitiated) { [weak self] in
             let outcome: TranscriptionOutcome
             let coordResult = await coordinator.run(audioURL: audioURL, options: options)
             switch coordResult {
@@ -731,9 +752,24 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             case .failure(let message):
                 outcome = .failure(message)
             }
-            NSLog("WhisperHot: transcription task returned (\(coordResult.logTag))")
-            await self?.finishTranscription(outcome: outcome)
+            NSLog("WhisperHot: transcription task returned (epoch=\(myEpoch), \(coordResult.logTag))")
+            await self?.deliverTranscriptionResult(outcome: outcome, epoch: myEpoch)
         }
+    }
+
+    /// Routes a transcription Task's result back to `finishTranscription` only
+    /// if it is still the current run. A result whose epoch no longer matches
+    /// `transcriptionEpoch` is from a Task that was cancelled (sleep/wake) or
+    /// superseded (new recording started before old result arrived); routing
+    /// that through finishTranscription would reset state in the middle of an
+    /// unrelated user action.
+    private func deliverTranscriptionResult(outcome: TranscriptionOutcome, epoch: UInt64) {
+        guard epoch == transcriptionEpoch else {
+            NSLog("WhisperHot: discarding stale transcription result (epoch=\(epoch), current=\(transcriptionEpoch))")
+            return
+        }
+        transcriptionTask = nil
+        finishTranscription(outcome: outcome)
     }
 
     private func finishTranscription(outcome: TranscriptionOutcome) {
