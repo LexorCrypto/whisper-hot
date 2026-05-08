@@ -615,8 +615,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    // Provider factories moved to TranscriptionCoordinator.swift
-
     private func captureRecordingTarget() {
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {

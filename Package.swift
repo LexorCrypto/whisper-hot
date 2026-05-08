@@ -7,8 +7,7 @@ let package = Package(
     targets: [
         .target(
             name: "WhisperHotLib",
-            path: "Sources/WhisperHot",
-            exclude: ["WhisperHotApp.swift"]
+            path: "Sources/WhisperHot"
         ),
         .executableTarget(
             name: "WhisperHot",
