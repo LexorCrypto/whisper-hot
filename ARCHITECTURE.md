@@ -1,7 +1,7 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 43 Swift файла, ~7680 строк. Три SwiftPM target:
+приложение. 43 Swift файла, ~7710 строк. Три SwiftPM target:
 `WhisperHotLib` (library), `WhisperHot` (thin executable),
 `WhisperHotTests` (unit tests с @testable import). AppKit — основная оболочка,
 SwiftUI живёт внутри Settings, Onboarding, History и recording

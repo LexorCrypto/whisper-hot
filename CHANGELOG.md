@@ -2,6 +2,56 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.6.7] — 2026-05-08
+
+Багфикс-релиз. Закрывает 3 проблемы, найденные adversarial Codex-ревью на v0.6.6.
+
+### Для пользователей
+
+- **Тоггл «Auto-switch to Offline when slow» больше не молчит впустую.**
+  Раньше можно было поставить галочку даже без настроенного локального
+  whisper.cpp — и она ничего не делала, потому что race-логика тихо
+  отключалась когда fallback недоступен. Теперь пункт меню становится
+  серым и не кликабельным, если local whisper не настроен (нет путей к
+  бинарю или модели), с подсказкой «Сначала настрой Local whisper.cpp в
+  Settings → Providers».
+- **Cancellation работает корректно при отмене записи.** Если по какой-то
+  причине транскрипция отменяется (закрытие приложения, форс-стоп), она
+  теперь действительно прерывается — а не догоняет локальной
+  транскрипцией задним числом, как могло раньше.
+- **Защита от corrupted-настроек.** Поле «timeout seconds» в настройках
+  теперь обрезается до диапазона `[1, 3600]` секунд. Раньше любое значение
+  больше ~18 миллиардов секунд переполняло `UInt64` при умножении на
+  наносекунды и могло крашить старт транскрипции.
+
+### Для разработчиков
+
+- `FallbackTranscriptionService.transcribeWithTimeoutRace()`:
+  - Timer-таска теперь использует `try await Task.sleep` (без `try?`),
+    чтобы parent-task cancellation бросал `CancellationError` через
+    `withThrowingTaskGroup`, а не маскировался как `.timeout` event с
+    запуском local whisper после уже отменённого вызова.
+  - Primary-таска проверяет `Task.isCancelled` после catch и re-raise'ит
+    `CancellationError` вместо того чтобы конвертировать `URLError.cancelled`
+    в `.primaryFailure`.
+  - Clamp `autoOfflineTimeoutSeconds` к `max(1, min(seconds, 3600))` перед
+    multiplication на `1_000_000_000` — defense от UInt64 overflow.
+- `MenuBarController.refreshDynamicMenuState()` вычисляет
+  `isLocalWhisperReady()` (зеркало `TranscriptionCoordinator.makeLocalFallbackIfReady`)
+  и сетит `autoOfflineOnTimeoutMenuItem.isEnabled` соответственно. Tooltip
+  локализован RU/EN.
+- `TranscriptionCoordinator.fromPreferences()`: убран dead-code дубликат
+  чтения `Preferences.vocabularyHints` (фактический поток hints
+  происходит в `MenuBarController:662` через `TranscriptionOptions.prompt`).
+- `Tests/WhisperHotTests/FallbackTranscriptionServiceTests.swift`:
+  - `testParentCancellationPropagates` — `task.cancel()` после старта
+    race должен прерывать, а не доводить fallback до конца.
+  - `testToggleOnWithNilFallbackUsesLegacyPath` — race не должен
+    запускаться когда fallback nil.
+- `ContextRouterTests.testSlackMatchesCasual`: unused `let result =`
+  заменён на `_ =` smoke check.
+- Codex review: PASS, 25/25 тестов зелёные, no new warnings.
+
 ## [0.6.6] — 2026-05-08
 
 ### Для пользователей
