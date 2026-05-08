@@ -98,7 +98,7 @@ struct SettingsView: View {
             case .postProcessing: return L10n.postProcessing
             case .hotkey: return L10n.hotkey
             case .historyPrivacy: return L10n.historyPrivacy
-            case .updates: return L10n.lang == .ru ? "Обновления" : "Updates"
+            case .updates: return L10n.sectionUpdates
             }
         }
 
@@ -210,18 +210,16 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
             }
 
-            Section(L10n.lang == .ru ? "Технический словарь" : "Technical vocabulary") {
+            Section(L10n.technicalVocabulary) {
                 TextField(
-                    L10n.lang == .ru ? "Подсказки для распознавания" : "Recognition hints",
+                    L10n.recognitionHints,
                     text: $vocabularyHints,
                     prompt: Text("commit, deploy, push, Codex, OpenClaw, Claude, Docker"),
                     axis: .vertical
                 )
                 .lineLimit(2...4)
                 .textFieldStyle(.roundedBorder)
-                Text(L10n.lang == .ru
-                    ? "Через запятую. Передаются провайдеру как подсказка для лучшего распознавания технических терминов."
-                    : "Comma-separated. Passed to the STT provider as hints for better recognition of technical terms.")
+                Text(L10n.recognitionHintsHelp)
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -250,7 +248,7 @@ struct SettingsView: View {
                     Preferences.wordReplacements = wordReplacements
                 }
                 HStack {
-                    Button(L10n.lang == .ru ? "Добавить замену" : "Add replacement") {
+                    Button(L10n.addReplacement) {
                         wordReplacements.append(WordReplacement(from: "", to: ""))
                         Preferences.wordReplacements = wordReplacements
                     }
@@ -259,9 +257,7 @@ struct SettingsView: View {
                         Preferences.wordReplacements = wordReplacements
                     }
                 }
-                Text(L10n.lang == .ru
-                    ? "Замены применяются к тексту сразу после транскрипции (до LLM-обработки). Регистр не учитывается."
-                    : "Replacements are applied right after transcription (before LLM processing). Case-insensitive.")
+                Text(L10n.wordReplacementsHelp)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -300,7 +296,7 @@ struct SettingsView: View {
 
     private var providersTab: some View {
         Form {
-            Section(L10n.lang == .ru ? "Облачный провайдер" : "Cloud provider") {
+            Section(L10n.sectionCloudProvider) {
                 Picker(L10n.provider, selection: $provider) {
                     // Show cloud providers only; local whisper has its own section below
                     ForEach(TranscriptionProvider.allCases.filter { $0 != .localWhisper }) { p in
@@ -384,7 +380,7 @@ struct SettingsView: View {
         Section("Local whisper.cpp") {
             // Toggle to use local whisper as the active provider
             Toggle(
-                L10n.lang == .ru ? "Использовать локальную транскрипцию" : "Use local transcription",
+                L10n.useLocalTranscription,
                 isOn: Binding(
                     get: { provider == .localWhisper },
                     set: { newValue in provider = newValue ? .localWhisper : .openai }
@@ -395,10 +391,10 @@ struct SettingsView: View {
             HStack {
                 switch whisperInstaller.status {
                 case .installed:
-                    Label(L10n.lang == .ru ? "Установлено" : "Installed", systemImage: "checkmark.circle.fill")
+                    Label(L10n.installerInstalled, systemImage: "checkmark.circle.fill")
                         .foregroundColor(.green)
                 case .notInstalled:
-                    Label(L10n.lang == .ru ? "Не установлено" : "Not installed", systemImage: "xmark.circle")
+                    Label(L10n.installerNotInstalled, systemImage: "xmark.circle")
                         .foregroundColor(.secondary)
                 case .installing(let step):
                     ProgressView()
@@ -420,11 +416,11 @@ struct SettingsView: View {
                 Spacer()
                 switch whisperInstaller.status {
                 case .notInstalled, .failed:
-                    Button(L10n.lang == .ru ? "Установить" : "Install") {
+                    Button(L10n.installerInstall) {
                         Task { await whisperInstaller.install() }
                     }
                 case .installing, .downloading:
-                    Button(L10n.lang == .ru ? "Отмена" : "Cancel") {
+                    Button(L10n.installerCancel) {
                         whisperInstaller.cancel()
                     }
                 case .installed:
@@ -433,9 +429,7 @@ struct SettingsView: View {
             }
 
             // Manual path overrides (advanced)
-            // Manual path configuration
-            Toggle(L10n.lang == .ru ? "Ручная настройка путей" : "Manual path configuration",
-                   isOn: $showManualWhisperPaths)
+            Toggle(L10n.manualPathConfiguration, isOn: $showManualWhisperPaths)
                 .font(.caption)
 
             if showManualWhisperPaths {
@@ -467,9 +461,7 @@ struct SettingsView: View {
                 }
             }
 
-            Text(L10n.lang == .ru
-                ? "Нажмите «Установить» для автоматической установки whisper-cpp через Homebrew и загрузки модели ggml-base (~142 МБ). Установка занимает 2-5 минут. Или настройте пути вручную."
-                : "Click Install to automatically set up whisper-cpp via Homebrew and download the ggml-base model (~142 MB). Installation takes 2-5 minutes. Or configure paths manually.")
+            Text(L10n.localWhisperInstallHelp)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -620,24 +612,22 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         case .localLLM:
-            TextField(L10n.lang == .ru ? "Путь к llama-cli" : "llama-cli path",
+            TextField(L10n.llamaCliPath,
                       text: $localLLMBinaryPath,
                       prompt: Text("/opt/homebrew/bin/llama-cli"))
                 .textFieldStyle(.roundedBorder)
-            TextField(L10n.lang == .ru ? "Путь к GGUF модели" : "GGUF model path",
+            TextField(L10n.ggufModelPath,
                       text: $localLLMModelPath,
                       prompt: Text("~/models/llama-3.1-8b-q4.gguf"))
                 .textFieldStyle(.roundedBorder)
-            Text(L10n.lang == .ru
-                ? "Полностью офлайн обработка. Установите llama.cpp: brew install llama.cpp. Скачайте GGUF модель с huggingface.co."
-                : "Fully offline processing. Install: brew install llama.cpp. Download a GGUF model from huggingface.co.")
+            Text(L10n.localLLMHelp)
                 .font(.caption)
                 .foregroundColor(.secondary)
         case .custom:
             TextField("Endpoint URL", text: $customEndpointURL, prompt: Text("https://api.polza.ai/v1/chat/completions"))
                 .textFieldStyle(.roundedBorder)
             if !customEndpointURL.isEmpty, PostProcessingProvider.custom.endpoint == nil {
-                Label(L10n.lang == .ru ? "Неверный URL. Должен начинаться с https://" : "Invalid URL. Must start with https://", systemImage: "exclamationmark.triangle.fill")
+                Label(L10n.invalidHttpsURL, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundColor(.red)
             }
@@ -796,9 +786,9 @@ struct SettingsView: View {
 
     private var updatesTab: some View {
         Form {
-            Section(L10n.lang == .ru ? "Версия" : "Version") {
+            Section(L10n.sectionVersion) {
                 HStack {
-                    Text(L10n.lang == .ru ? "Текущая версия:" : "Current version:")
+                    Text(L10n.currentVersionLabel)
                     Text(updateChecker.currentVersion)
                         .fontWeight(.medium)
                 }
@@ -810,23 +800,20 @@ struct SettingsView: View {
                     HStack {
                         ProgressView()
                             .controlSize(.small)
-                        Text(L10n.lang == .ru ? "Проверяю..." : "Checking...")
+                        Text(L10n.checkingUpdates)
                             .foregroundColor(.secondary)
                     }
                 case .upToDate(let version):
-                    Label(
-                        L10n.lang == .ru ? "Вы используете последнюю версию (\(version))" : "You're on the latest version (\(version))",
-                        systemImage: "checkmark.circle.fill"
-                    )
-                    .foregroundColor(.green)
+                    Label(L10n.upToDateMessage(version), systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.green)
                 case .updateAvailable(let current, let latest, _):
                     VStack(alignment: .leading, spacing: 6) {
                         Label(
-                            L10n.lang == .ru ? "Доступна версия \(latest) (у вас \(current))" : "Version \(latest) available (you have \(current))",
+                            L10n.updateAvailableMessage(latest: latest, current: current),
                             systemImage: "arrow.down.circle.fill"
                         )
                         .foregroundColor(.orange)
-                        Button(L10n.lang == .ru ? "Скачать обновление" : "Download update") {
+                        Button(L10n.downloadUpdate) {
                             updateChecker.openDownload()
                         }
                     }
@@ -836,17 +823,15 @@ struct SettingsView: View {
                         .font(.caption)
                 }
 
-                Button(L10n.lang == .ru ? "Проверить обновления" : "Check for updates") {
+                Button(L10n.checkForUpdates) {
                     Task { await updateChecker.check(force: true) }
                 }
             }
 
-            Section(L10n.lang == .ru ? "О приложении" : "About") {
+            Section(L10n.sectionAbout) {
                 Text("WhisperHot \(updateChecker.currentVersion)")
                     .font(.headline)
-                Text(L10n.lang == .ru
-                    ? "macOS приложение для голосовой транскрипции. Apple Silicon (M1+), macOS 13.0+."
-                    : "macOS speech-to-text app. Apple Silicon (M1+), macOS 13.0+.")
+                Text(L10n.aboutAppDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Text("Apache License 2.0")

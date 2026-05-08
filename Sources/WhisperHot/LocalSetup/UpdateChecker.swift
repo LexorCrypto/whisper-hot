@@ -63,9 +63,7 @@ final class UpdateChecker: ObservableObject {
             lastCheckDate = Date()
 
             if http.statusCode == 403 || http.statusCode == 429 {
-                status = .failed(message: L10n.lang == .ru
-                    ? "Превышен лимит запросов GitHub API. Попробуйте позже."
-                    : "GitHub API rate limit exceeded. Try again later.")
+                status = .failed(message: L10n.githubRateLimitExceeded)
                 return
             }
 

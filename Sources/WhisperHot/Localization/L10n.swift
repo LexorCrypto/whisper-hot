@@ -110,6 +110,122 @@ enum L10n {
     static var permissions: String { lang == .ru ? "Разрешения и настройка…" : "Permissions & Onboarding…" }
     static var quit: String { lang == .ru ? "Завершить WhisperHot" : "Quit WhisperHot" }
     static var autoOfflineOnTimeout: String { lang == .ru ? "Авто-переключение на Offline при медленной сети" : "Auto-switch to Offline when slow" }
+    static var stop: String { lang == .ru ? "Стоп" : "Stop" }
+
+    // MARK: - Recording / transcription banners (status menu)
+    static func recordingErrorBanner(_ message: String) -> String {
+        lang == .ru ? "⚠ Ошибка записи: \(message)" : "⚠ Recording error: \(message)"
+    }
+    static func transcriptionErrorBanner(_ message: String) -> String {
+        lang == .ru ? "⚠ Ошибка транскрипции: \(message)" : "⚠ Transcription error: \(message)"
+    }
+    static var offlineFallbackBanner: String {
+        lang == .ru
+            ? "⚡ Использована локальная транскрипция (нет интернета)"
+            : "⚡ Used local transcription (offline)"
+    }
+    static var autoOfflineNeedsLocalWhisperTooltip: String {
+        lang == .ru
+            ? "Сначала настрой Local whisper.cpp в Settings → Providers"
+            : "Set up Local whisper.cpp in Settings → Providers first"
+    }
+
+    // MARK: - Settings sections (additional)
+    static var sectionUpdates: String { lang == .ru ? "Обновления" : "Updates" }
+    static var sectionAbout: String { lang == .ru ? "О приложении" : "About" }
+    static var sectionVersion: String { lang == .ru ? "Версия" : "Version" }
+    static var sectionCloudProvider: String { lang == .ru ? "Облачный провайдер" : "Cloud provider" }
+    static var technicalVocabulary: String { lang == .ru ? "Технический словарь" : "Technical vocabulary" }
+    static var recognitionHints: String { lang == .ru ? "Подсказки для распознавания" : "Recognition hints" }
+    static var recognitionHintsHelp: String {
+        lang == .ru
+            ? "Через запятую. Передаются провайдеру как подсказка для лучшего распознавания технических терминов."
+            : "Comma-separated. Passed to the STT provider as hints for better recognition of technical terms."
+    }
+    static var addReplacement: String { lang == .ru ? "Добавить замену" : "Add replacement" }
+    static var wordReplacementsHelp: String {
+        lang == .ru
+            ? "Замены применяются к тексту сразу после транскрипции (до LLM-обработки). Регистр не учитывается."
+            : "Replacements are applied right after transcription (before LLM processing). Case-insensitive."
+    }
+
+    // MARK: - Local whisper installer
+    static var useLocalTranscription: String {
+        lang == .ru ? "Использовать локальную транскрипцию" : "Use local transcription"
+    }
+    static var installerInstalled: String { lang == .ru ? "Установлено" : "Installed" }
+    static var installerNotInstalled: String { lang == .ru ? "Не установлено" : "Not installed" }
+    static var installerInstall: String { lang == .ru ? "Установить" : "Install" }
+    static var installerCancel: String { lang == .ru ? "Отмена" : "Cancel" }
+    static var manualPathConfiguration: String {
+        lang == .ru ? "Ручная настройка путей" : "Manual path configuration"
+    }
+    static var localWhisperInstallHelp: String {
+        lang == .ru
+            ? "Нажмите «Установить» для автоматической установки whisper-cpp через Homebrew и загрузки модели ggml-base (~142 МБ). Установка занимает 2-5 минут. Или настройте пути вручную."
+            : "Click Install to automatically set up whisper-cpp via Homebrew and download the ggml-base model (~142 MB). Installation takes 2-5 minutes. Or configure paths manually."
+    }
+    static var homebrewNotFound: String {
+        lang == .ru
+            ? "Homebrew не найден. Установите (2-5 мин): /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            : "Homebrew not found. Install (2-5 min): /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    }
+    static var installingWhisperViaBrew: String {
+        lang == .ru
+            ? "Установка whisper-cpp через Homebrew (2-5 мин)..."
+            : "Installing whisper-cpp via Homebrew (2-5 min)..."
+    }
+    static var installFinishedFilesMissing: String {
+        lang == .ru
+            ? "Установка завершена, но файлы не найдены"
+            : "Installation finished but files not found"
+    }
+
+    // MARK: - Local LLM (post-processing)
+    static var llamaCliPath: String { lang == .ru ? "Путь к llama-cli" : "llama-cli path" }
+    static var ggufModelPath: String { lang == .ru ? "Путь к GGUF модели" : "GGUF model path" }
+    static var localLLMHelp: String {
+        lang == .ru
+            ? "Полностью офлайн обработка. Установите llama.cpp: brew install llama.cpp. Скачайте GGUF модель с huggingface.co."
+            : "Fully offline processing. Install: brew install llama.cpp. Download a GGUF model from huggingface.co."
+    }
+
+    // MARK: - Custom endpoint validation
+    static var invalidHttpsURL: String {
+        lang == .ru
+            ? "Неверный URL. Должен начинаться с https://"
+            : "Invalid URL. Must start with https://"
+    }
+
+    // MARK: - Updates
+    static var currentVersionLabel: String { lang == .ru ? "Текущая версия:" : "Current version:" }
+    static var checkingUpdates: String { lang == .ru ? "Проверяю..." : "Checking..." }
+    static func upToDateMessage(_ version: String) -> String {
+        lang == .ru
+            ? "Вы используете последнюю версию (\(version))"
+            : "You're on the latest version (\(version))"
+    }
+    static func updateAvailableMessage(latest: String, current: String) -> String {
+        lang == .ru
+            ? "Доступна версия \(latest) (у вас \(current))"
+            : "Version \(latest) available (you have \(current))"
+    }
+    static var downloadUpdate: String {
+        lang == .ru ? "Скачать обновление" : "Download update"
+    }
+    static var checkForUpdates: String {
+        lang == .ru ? "Проверить обновления" : "Check for updates"
+    }
+    static var aboutAppDescription: String {
+        lang == .ru
+            ? "macOS приложение для голосовой транскрипции. Apple Silicon (M1+), macOS 13.0+."
+            : "macOS speech-to-text app. Apple Silicon (M1+), macOS 13.0+."
+    }
+    static var githubRateLimitExceeded: String {
+        lang == .ru
+            ? "Превышен лимит запросов GitHub API. Попробуйте позже."
+            : "GitHub API rate limit exceeded. Try again later."
+    }
 
     // MARK: - Provider descriptions
     static func providerDescription(for p: TranscriptionProvider) -> String {

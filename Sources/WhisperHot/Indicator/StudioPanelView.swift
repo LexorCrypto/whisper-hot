@@ -53,7 +53,7 @@ struct StudioPanelView: View {
         HStack(spacing: 14) {
             Spacer()
             HStack(spacing: 6) {
-                Text(L10n.lang == .ru ? "Стоп" : "Stop")
+                Text(L10n.stop)
                     .foregroundColor(.white.opacity(0.85))
                 keyCap(stopHotkeyLabel)
             }

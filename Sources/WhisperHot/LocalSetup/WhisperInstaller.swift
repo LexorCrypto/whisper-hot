@@ -76,13 +76,11 @@ final class WhisperInstaller: ObservableObject {
         // Step 1: Check/install whisper-cli via Homebrew
         if findWhisperBinary() == nil {
             guard let brewPath = findBrew() else {
-                status = .failed(message: L10n.lang == .ru
-                    ? "Homebrew не найден. Установите (2-5 мин): /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-                    : "Homebrew not found. Install (2-5 min): /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"")
+                status = .failed(message: L10n.homebrewNotFound)
                 return
             }
 
-            status = .installing(step: L10n.lang == .ru ? "Установка whisper-cpp через Homebrew (2-5 мин)..." : "Installing whisper-cpp via Homebrew (2-5 min)...")
+            status = .installing(step: L10n.installingWhisperViaBrew)
 
             let success = await runBrew(brewPath: brewPath)
             if !success {
@@ -105,9 +103,7 @@ final class WhisperInstaller: ObservableObject {
             syncPreferences()
             status = .installed
         } else {
-            status = .failed(message: L10n.lang == .ru
-                ? "Установка завершена, но файлы не найдены"
-                : "Installation finished but files not found")
+            status = .failed(message: L10n.installFinishedFilesMissing)
         }
     }
 

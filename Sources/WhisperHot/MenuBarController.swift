@@ -90,12 +90,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         audioRecorder.onRecordingError = { [weak self] message in
             MainActor.assumeIsolated {
-                self?.setPostProcessingError(
-                    L10n.lang == .ru
-                        ? "⚠ Ошибка записи: \(message)"
-                        : "⚠ Recording error: \(message)",
-                    raw: true
-                )
+                self?.setPostProcessingError(L10n.recordingErrorBanner(message), raw: true)
             }
         }
         hotkeyManager.onHotkey = { [weak self] in
@@ -526,11 +521,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if let item = autoOfflineOnTimeoutMenuItem {
             item.isEnabled = localReady
             item.state = (localReady && Preferences.autoOfflineOnTimeout) ? .on : .off
-            item.toolTip = localReady
-                ? nil
-                : (L10n.lang == .ru
-                    ? "Сначала настрой Local whisper.cpp в Settings → Providers"
-                    : "Set up Local whisper.cpp in Settings → Providers first")
+            item.toolTip = localReady ? nil : L10n.autoOfflineNeedsLocalWhisperTooltip
         }
     }
 
@@ -715,10 +706,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             // Non-modal signal: post-processing failure or offline fallback
             // shows up as a sticky banner at the top of the status menu.
             if result.usedOfflineFallback {
-                setPostProcessingError(L10n.lang == .ru
-                    ? "⚡ Использована локальная транскрипция (нет интернета)"
-                    : "⚡ Used local transcription (offline)",
-                    raw: true)
+                setPostProcessingError(L10n.offlineFallbackBanner, raw: true)
             } else {
                 switch result.postProcessing {
                 case .failed(let reason):
@@ -755,10 +743,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .failure(let message):
             NSLog("WhisperHot: transcription error")
             // Show error banner in menu so user knows something went wrong
-            setPostProcessingError(L10n.lang == .ru
-                ? "⚠ Ошибка транскрипции: \(message)"
-                : "⚠ Transcription error: \(message)",
-                raw: true)
+            setPostProcessingError(L10n.transcriptionErrorBanner(message), raw: true)
             // Failure path intentionally does NOT delete the audio file:
             // leaving it gives the startup sweep (or the user) a retry
             // window. The sweep still enforces the configured max age.
