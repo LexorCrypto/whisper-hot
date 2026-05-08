@@ -288,21 +288,65 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         syncHotkeyBindings()
     }
 
-    // MARK: - Sleep / wake (instrumentation)
+    // MARK: - Sleep / wake
 
-    /// Logged when macOS posts `NSWorkspace.willSleepNotification`. Future
-    /// steps will cancel the in-flight transcription task and invalidate
-    /// provider URLSessions here so post-wake state is clean.
+    /// macOS is about to sleep. Pre-emptively kill the in-flight
+    /// transcription so its URLSession can't strand the app in
+    /// `.transcribing` after wake — the kernel will close sockets out from
+    /// under URLSession, but URLSession does not always observe that
+    /// promptly, so a stuck request can outlive the sleep for
+    /// `timeoutIntervalForResource` (minutes). Bumping the epoch makes any
+    /// late-arriving result a no-op via the guard in
+    /// `deliverTranscriptionResult`.
+    ///
+    /// Known limitation: `Task.cancel()` only marks the Swift task
+    /// cancelled. `LocalWhisperProvider` and `LocalLLMProcessor` spawn
+    /// `Process` inside a checked continuation without a cancellation
+    /// handler, so an offline-fallback subprocess (or local LLM
+    /// post-processor) can outlive this handler and keep consuming CPU.
+    /// Out of scope for Step 3 — converting those to honour cancellation
+    /// belongs in a follow-up.
+    ///
+    /// `.recording` is intentionally left alone here. AVAudioEngine teardown
+    /// on the main thread (`tapGroup.wait()`, `writerQueue.sync {}`) is the
+    /// risky path Step 5 will address — this handler stays conservative and
+    /// lets the existing `AVAudioEngineConfigurationChange` observer drive
+    /// recording teardown if the device topology changes during sleep.
     private func handleWorkspaceWillSleep() {
         NSLog("WhisperHot: workspace willSleep (state=\(state), startingRec=\(isStartingRecording))")
+
+        if state == .transcribing {
+            transcriptionTask?.cancel()
+            transcriptionTask = nil
+            transcriptionEpoch &+= 1
+            state = .idle
+            recordMenuItem?.title = L10n.startRecording
+            indicatorController.hide()
+            recordingTarget = nil
+            currentRecordingURL = nil
+            // Leave the WAV on disk and let the retention sweep manage it —
+            // matches the `.failure` path of `finishTranscription`. Deleting
+            // unconditionally here would override a user who picked
+            // `.untilQuit` / `.oneHour` / `.forever` and lose the only audio
+            // copy of a transcription that was simply interrupted by sleep.
+            AudioRetentionSweeper.activeRecordingURL = nil
+        }
     }
 
-    /// Logged when macOS posts `NSWorkspace.didWakeNotification`. Future
-    /// steps will reset the audio engine and re-arm the hotkey here so a
-    /// stale Carbon ref or AVAudioEngine zombie cannot freeze the next
-    /// recording attempt.
+    /// macOS just woke. Re-register the Carbon hotkey to defend against a
+    /// stale `EventHotKeyRef` after suspend, and let `syncHotkeyBindings`
+    /// also re-arm Fn if that's the active transport. Audio engine reset
+    /// is deferred to Step 5 — touching AVAudioEngine here without the
+    /// non-blocking reset path could hit the same teardown deadlock we're
+    /// trying to dig out of.
     private func handleWorkspaceDidWake() {
         NSLog("WhisperHot: workspace didWake (state=\(state), startingRec=\(isStartingRecording))")
+        // Don't fight the Settings hotkey-recorder UI: handleRecorderArm()
+        // intentionally unregistered Carbon for the capture session. If
+        // sleep happens mid-capture, leave the recorder armed and let
+        // handleRecorderDisarm() re-sync when it finishes.
+        if isHotkeyRecorderArmed { return }
+        syncHotkeyBindings()
     }
 
     private func scheduleFnRetryTimer() {
