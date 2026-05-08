@@ -19,11 +19,23 @@ struct TranscriptionCoordinator: Sendable {
     enum Outcome: Sendable {
         case success(TranscriptionResult)
         case failure(String)
+
+        /// Compact tag for log lines. Avoids dumping the full transcript or
+        /// failure message into NSLog while still distinguishing happy vs
+        /// sad path in retrospective hang investigations.
+        var logTag: String {
+            switch self {
+            case .success: return "success"
+            case .failure: return "failure"
+            }
+        }
     }
 
     func run(audioURL: URL, options: TranscriptionOptions) async -> Outcome {
         do {
+            NSLog("WhisperHot: pipeline phase=stt-begin")
             let raw = try await service.transcribe(audioURL: audioURL, options: options)
+            NSLog("WhisperHot: pipeline phase=stt-end (\(raw.text.count) chars, fallback=\(raw.usedOfflineFallback))")
 
             // Apply word replacements before post-processing
             let fixedText = wordReplacements.isEmpty
@@ -40,15 +52,17 @@ struct TranscriptionCoordinator: Sendable {
             if raw.usedOfflineFallback {
                 NSLog("WhisperHot: offline fallback used, skipping post-processing")
             } else if let localLLM = localLLMProcessor, let ppOptions = postProcessingOptions {
+                NSLog("WhisperHot: pipeline phase=pp-begin (local-llm)")
                 do {
                     let processed = try await localLLM.process(text: fixedText, options: ppOptions)
+                    NSLog("WhisperHot: pipeline phase=pp-end (local-llm ok)")
                     finalResult = TranscriptionResult(
                         text: processed,
                         providerModel: raw.providerModel,
                         postProcessing: .succeeded(model: "local-llm", preset: ppOptions.preset.rawValue)
                     )
                 } catch {
-                    NSLog("WhisperHot: local LLM failed")
+                    NSLog("WhisperHot: pipeline phase=pp-end (local-llm failed)")
                     finalResult = TranscriptionResult(
                         text: fixedText,
                         providerModel: raw.providerModel,
@@ -56,11 +70,13 @@ struct TranscriptionCoordinator: Sendable {
                     )
                 }
             } else if let postProcessor, let ppOptions = postProcessingOptions {
+                NSLog("WhisperHot: pipeline phase=pp-begin (cloud) %@", ppOptions.model)
                 do {
                     let processed = try await postProcessor.process(
                         text: fixedText,
                         options: ppOptions
                     )
+                    NSLog("WhisperHot: pipeline phase=pp-end (cloud ok)")
                     finalResult = TranscriptionResult(
                         text: processed,
                         providerModel: raw.providerModel,
@@ -70,7 +86,7 @@ struct TranscriptionCoordinator: Sendable {
                         )
                     )
                 } catch {
-                    NSLog("WhisperHot: post-processing failed")
+                    NSLog("WhisperHot: pipeline phase=pp-end (cloud failed)")
                     finalResult = TranscriptionResult(
                         text: fixedText,
                         providerModel: raw.providerModel,
@@ -81,6 +97,7 @@ struct TranscriptionCoordinator: Sendable {
 
             return .success(finalResult)
         } catch {
+            NSLog("WhisperHot: pipeline phase=stt-failed %@", error.localizedDescription)
             return .failure(error.localizedDescription)
         }
     }

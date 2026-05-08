@@ -36,7 +36,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// changes, so the user sees the current choice at a glance.
     private var providerSubmenu: NSMenu?
     private var autoOfflineOnTimeoutMenuItem: NSMenuItem?
-    private var state: RecorderState = .idle
+    private var state: RecorderState = .idle {
+        didSet {
+            guard oldValue != state else { return }
+            NSLog("WhisperHot: state \(oldValue) → \(state)")
+        }
+    }
     private var isStartingRecording = false
     /// The app that was frontmost when recording started. Used by PasteService
     /// to verify the paste target is still focused when the transcription
@@ -71,6 +76,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// deinit. MenuBarController lives for the app lifetime in practice,
     /// so this is defensive hygiene rather than leak prevention.
     private var notificationTokens: [NSObjectProtocol] = []
+
+    /// Sleep/wake observer tokens — separate from `notificationTokens`
+    /// because they were registered with `NSWorkspace.shared.notificationCenter`,
+    /// not `NotificationCenter.default`. Removing a token from the wrong
+    /// center is a silent no-op.
+    private var workspaceTokens: [NSObjectProtocol] = []
 
     private enum TranscriptionOutcome: Sendable {
         case success(TranscriptionResult)
@@ -152,6 +163,31 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         notificationTokens.append(disarmToken)
 
+        // Sleep/wake instrumentation (Step 1 of hang investigation).
+        // Log-only for now: a future step cancels the in-flight transcription
+        // task on willSleep and re-arms the hotkey on didWake.
+        let willSleepToken = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.handleWorkspaceWillSleep()
+            }
+        }
+        workspaceTokens.append(willSleepToken)
+
+        let didWakeToken = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.handleWorkspaceDidWake()
+            }
+        }
+        workspaceTokens.append(didWakeToken)
+
         syncHotkeyBindings()
 
         // Enforce history retention on launch so aged records from prior
@@ -172,6 +208,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // sane.
         for token in notificationTokens {
             NotificationCenter.default.removeObserver(token)
+        }
+        for token in workspaceTokens {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
         }
         fnRetryTimer?.invalidate()
     }
@@ -233,6 +272,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func handleRecorderDisarm() {
         isHotkeyRecorderArmed = false
         syncHotkeyBindings()
+    }
+
+    // MARK: - Sleep / wake (instrumentation)
+
+    /// Logged when macOS posts `NSWorkspace.willSleepNotification`. Future
+    /// steps will cancel the in-flight transcription task and invalidate
+    /// provider URLSessions here so post-wake state is clean.
+    private func handleWorkspaceWillSleep() {
+        NSLog("WhisperHot: workspace willSleep (state=\(state), startingRec=\(isStartingRecording))")
+    }
+
+    /// Logged when macOS posts `NSWorkspace.didWakeNotification`. Future
+    /// steps will reset the audio engine and re-arm the hotkey here so a
+    /// stale Carbon ref or AVAudioEngine zombie cannot freeze the next
+    /// recording attempt.
+    private func handleWorkspaceDidWake() {
+        NSLog("WhisperHot: workspace didWake (state=\(state), startingRec=\(isStartingRecording))")
     }
 
     private func scheduleFnRetryTimer() {
@@ -665,6 +721,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             options.prompt = hints
         }
 
+        NSLog("WhisperHot: transcription task launching (provider=\(Preferences.provider.rawValue))")
         Task.detached(priority: .userInitiated) { [weak self] in
             let outcome: TranscriptionOutcome
             let coordResult = await coordinator.run(audioURL: audioURL, options: options)
@@ -674,6 +731,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             case .failure(let message):
                 outcome = .failure(message)
             }
+            NSLog("WhisperHot: transcription task returned (\(coordResult.logTag))")
             await self?.finishTranscription(outcome: outcome)
         }
     }
