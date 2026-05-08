@@ -148,7 +148,7 @@ struct TranscriptionCoordinator: Sendable {
         }
         let postProcessingOptions: PostProcessingOptions? = skipPostProcessing ? nil : ppOptions
 
-        let hints = Preferences.vocabularyHints.trimmingCharacters(in: .whitespacesAndNewlines)
+        // vocabularyHints are read in MenuBarController and passed via TranscriptionOptions.prompt.
         let wordReplacements = Preferences.wordReplacements
 
         return TranscriptionCoordinator(

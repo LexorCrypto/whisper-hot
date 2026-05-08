@@ -83,6 +83,70 @@ final class FallbackTranscriptionServiceTests: XCTestCase {
         }
     }
 
+    func testToggleOnWithNilFallbackUsesLegacyPath() async throws {
+        // When toggle is enabled but local whisper isn't configured (fallback nil),
+        // the timeout race must NOT run — primary should be awaited normally.
+        let primary = DelayedMockTranscriptionService(
+            delayNanoseconds: 50_000_000,
+            result: TranscriptionResult(text: "cloud", providerModel: "cloud-model")
+        )
+        let service = FallbackTranscriptionService(
+            primary: primary,
+            fallback: nil,
+            autoOfflineOnTimeout: true,
+            autoOfflineTimeoutSeconds: 1
+        )
+
+        let result = try await service.transcribe(
+            audioURL: URL(fileURLWithPath: "/tmp/mock.wav"),
+            options: TranscriptionOptions()
+        )
+
+        XCTAssertEqual(result.text, "cloud")
+        XCTAssertFalse(result.usedOfflineFallback)
+    }
+
+    func testParentCancellationPropagates() async throws {
+        // Cancelling the calling Task must abort the race instead of silently
+        // converting timer cancellation into a .timeout that triggers fallback.
+        let primary = DelayedMockTranscriptionService(
+            delayNanoseconds: 10_000_000_000,
+            result: TranscriptionResult(text: "cloud", providerModel: "cloud-model")
+        )
+        let fallback = DelayedMockTranscriptionService(
+            delayNanoseconds: 10_000_000_000,
+            result: TranscriptionResult(text: "local", providerModel: "local-model")
+        )
+        let service = FallbackTranscriptionService(
+            primary: primary,
+            fallback: fallback,
+            autoOfflineOnTimeout: true,
+            autoOfflineTimeoutSeconds: 60
+        )
+
+        let task = Task {
+            try await service.transcribe(
+                audioURL: URL(fileURLWithPath: "/tmp/mock.wav"),
+                options: TranscriptionOptions()
+            )
+        }
+
+        // Cancel before either primary or timeout could win naturally.
+        try await Task.sleep(nanoseconds: 100_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation to propagate")
+        } catch is CancellationError {
+            // expected
+        } catch {
+            // Some platforms may surface URLError.cancelled or similar; accept any
+            // non-success outcome that signals abort.
+            XCTAssertTrue(true, "non-success outcome on cancel — accepted")
+        }
+    }
+
     func testToggleOffPreservesLegacyBehavior() async throws {
         let primary = DelayedMockTranscriptionService(
             delayNanoseconds: 50_000_000,

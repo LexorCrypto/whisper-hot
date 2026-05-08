@@ -71,7 +71,10 @@ final class FallbackTranscriptionService: TranscriptionService {
         options: TranscriptionOptions,
         fallback: TranscriptionService
     ) async throws -> TranscriptionResult {
-        let timeoutNanoseconds = UInt64(autoOfflineTimeoutSeconds) * 1_000_000_000
+        // Clamp to a sane range so a corrupted UserDefaults value can't
+        // overflow UInt64 or stall the app for years.
+        let clampedSeconds = max(1, min(autoOfflineTimeoutSeconds, 3600))
+        let timeoutNanoseconds = UInt64(clampedSeconds) * 1_000_000_000
         let primary = self.primary
 
         let raceResult: RaceEvent = try await withThrowingTaskGroup(of: RaceEvent.self) { group in
@@ -80,12 +83,19 @@ final class FallbackTranscriptionService: TranscriptionService {
                     let result = try await primary.transcribe(audioURL: audioURL, options: options)
                     return .primarySuccess(result)
                 } catch {
+                    // Re-raise on cancellation (URLError.cancelled or CancellationError).
+                    // Do NOT convert to .primaryFailure — that would start local fallback
+                    // after the caller has already aborted.
+                    if Task.isCancelled { throw CancellationError() }
                     return .primaryFailure(error)
                 }
             }
 
             group.addTask {
-                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                // Use plain `try` (not `try?`) so parent-task cancellation throws out
+                // of the group instead of being silently converted into a .timeout
+                // event that would kick off local transcription post-cancel.
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
                 return .timeout
             }
 

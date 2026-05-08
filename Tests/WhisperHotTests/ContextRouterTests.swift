@@ -16,11 +16,13 @@ final class ContextRouterTests: XCTestCase {
 
     func testSlackMatchesCasual() {
         let rules = ContextRule.defaults
-        let result = ContextRouter.resolve(
-            target: nil, // can't create NSRunningApplication in tests
+        // Smoke-check that resolve() doesn't crash on nil target.
+        // nil won't match non-wildcard rules, so the actual match contract
+        // is verified via the helper.
+        _ = ContextRouter.resolve(
+            target: nil,
             rules: [ContextRule(bundleID: "com.tinyspeck.slackmacgap", label: "Slack", preset: .slackCasual)]
         )
-        // nil target won't match non-wildcard rules, so test via helper
         XCTAssertEqual(resolveByBundleID("com.tinyspeck.slackmacgap", rules: rules), .slackCasual)
     }
 
