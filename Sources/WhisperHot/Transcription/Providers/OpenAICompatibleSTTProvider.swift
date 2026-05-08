@@ -27,7 +27,7 @@ final class OpenAICompatibleSTTProvider: TranscriptionService {
         model: String,
         maxAudioBytes: Int = 25 * 1024 * 1024,
         apiKeyProvider: @escaping @Sendable () throws -> String,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = HTTPClient.shared
     ) {
         self.endpoint = endpoint
         self.model = model

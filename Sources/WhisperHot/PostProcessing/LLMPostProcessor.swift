@@ -14,7 +14,7 @@ final class LLMPostProcessor: @unchecked Sendable {
         endpoint: URL,
         apiKeyProvider: @escaping @Sendable () throws -> String,
         extraHeaders: [String: String] = [:],
-        urlSession: URLSession = .shared
+        urlSession: URLSession = HTTPClient.shared
     ) {
         self.endpoint = endpoint
         self.extraHeaders = extraHeaders

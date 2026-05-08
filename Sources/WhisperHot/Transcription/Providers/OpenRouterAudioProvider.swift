@@ -25,7 +25,7 @@ final class OpenRouterAudioProvider: TranscriptionService {
     init(
         model: String = "openai/gpt-4o-audio-preview",
         apiKeyProvider: @escaping @Sendable () throws -> String,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = HTTPClient.shared
     ) {
         self.defaultModel = model
         self.apiKeyProvider = apiKeyProvider
