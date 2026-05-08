@@ -74,6 +74,10 @@ public enum Preferences {
         static let customEndpointModel = ""
         static let autoOfflineOnTimeout = false
         static let autoOfflineTimeoutSeconds = 10
+        static let appLanguage = AppLanguage.ru.rawValue
+        static let vocabularyHints = ""
+        static let localLLMBinaryPath = ""
+        static let localLLMModelPath = ""
     }
 
     /// Register baseline defaults so first-run reads return sensible values
@@ -108,7 +112,11 @@ public enum Preferences {
             Key.customEndpointURL: Defaults.customEndpointURL,
             Key.customEndpointModel: Defaults.customEndpointModel,
             Key.autoOfflineOnTimeout: Defaults.autoOfflineOnTimeout,
-            Key.autoOfflineTimeoutSeconds: Defaults.autoOfflineTimeoutSeconds
+            Key.autoOfflineTimeoutSeconds: Defaults.autoOfflineTimeoutSeconds,
+            Key.appLanguage: Defaults.appLanguage,
+            Key.vocabularyHints: Defaults.vocabularyHints,
+            Key.localLLMBinaryPath: Defaults.localLLMBinaryPath,
+            Key.localLLMModelPath: Defaults.localLLMModelPath
         ])
     }
 
@@ -259,7 +267,7 @@ public enum Preferences {
     /// Vocabulary hints passed to the STT provider as a prompt bias.
     /// Comma-separated technical terms: "commit, deploy, push, Codex".
     static var vocabularyHints: String {
-        UserDefaults.standard.string(forKey: Key.vocabularyHints) ?? ""
+        UserDefaults.standard.string(forKey: Key.vocabularyHints) ?? Defaults.vocabularyHints
     }
 
     /// Word replacements applied after transcription. Stored as JSON
@@ -279,11 +287,11 @@ public enum Preferences {
     }
 
     static var localLLMBinaryPath: String {
-        UserDefaults.standard.string(forKey: Key.localLLMBinaryPath) ?? ""
+        UserDefaults.standard.string(forKey: Key.localLLMBinaryPath) ?? Defaults.localLLMBinaryPath
     }
 
     static var localLLMModelPath: String {
-        UserDefaults.standard.string(forKey: Key.localLLMModelPath) ?? ""
+        UserDefaults.standard.string(forKey: Key.localLLMModelPath) ?? Defaults.localLLMModelPath
     }
 
     static var customEndpointURL: String {

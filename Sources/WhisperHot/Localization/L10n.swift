@@ -19,7 +19,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 /// Usage: `L10n.settings` returns the localized string for the current language.
 enum L10n {
     static var lang: AppLanguage {
-        let raw = UserDefaults.standard.string(forKey: Preferences.Key.appLanguage) ?? AppLanguage.ru.rawValue
+        let raw = UserDefaults.standard.string(forKey: Preferences.Key.appLanguage) ?? Preferences.Defaults.appLanguage
         return AppLanguage(rawValue: raw) ?? .ru
     }
 
