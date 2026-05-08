@@ -32,6 +32,18 @@ final class HistoryStore {
     private var loaded = false
 
     private let fileManager = FileManager.default
+    /// When non-nil, overrides the production Application Support path. Set
+    /// only by tests so they can encrypt/decrypt against a temporary directory
+    /// without touching the user's real history.
+    private let storageDirectoryOverride: URL?
+    /// Keychain service used to look up the AES-GCM encryption key. Production
+    /// uses `Keychain.defaultService`; tests pass a unique service prefix so
+    /// generated keys cannot pollute the user's real keychain.
+    private let keychainService: String
+    /// Configurable retention/cap providers. Production reads `Preferences.*`
+    /// each prune; tests inject deterministic values.
+    private let retentionDaysProvider: () -> Int
+    private let maxEntriesProvider: () -> Int
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
@@ -43,6 +55,18 @@ final class HistoryStore {
         return d
     }()
 
+    init(
+        storageDirectoryOverride: URL? = nil,
+        keychainService: String = Keychain.defaultService,
+        retentionDaysProvider: @escaping () -> Int = { Preferences.historyRetentionDays },
+        maxEntriesProvider: @escaping () -> Int = { Preferences.historyMaxEntries }
+    ) {
+        self.storageDirectoryOverride = storageDirectoryOverride
+        self.keychainService = keychainService
+        self.retentionDaysProvider = retentionDaysProvider
+        self.maxEntriesProvider = maxEntriesProvider
+    }
+
     // MARK: - Paths
 
     /// Throws if the Application Support directory cannot be resolved or
@@ -50,6 +74,12 @@ final class HistoryStore {
     /// callers instead of silently degrading into a later read/write
     /// failure with no context.
     private func resolveStorageDirectory() throws -> URL {
+        if let override = storageDirectoryOverride {
+            if !fileManager.fileExists(atPath: override.path) {
+                try fileManager.createDirectory(at: override, withIntermediateDirectories: true)
+            }
+            return override
+        }
         let base = try fileManager.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
@@ -153,13 +183,13 @@ final class HistoryStore {
 
     private func prune() {
         // Age cutoff
-        let retentionDays = Preferences.historyRetentionDays
+        let retentionDays = retentionDaysProvider()
         if retentionDays > 0 {
             let cutoff = Date().addingTimeInterval(-Double(retentionDays) * 86_400)
             records = records.filter { $0.createdAt >= cutoff }
         }
         // Size cap
-        let maxEntries = max(Preferences.historyMaxEntries, 1)
+        let maxEntries = max(maxEntriesProvider(), 1)
         if records.count > maxEntries {
             records = Array(records.prefix(maxEntries))
         }
@@ -211,7 +241,7 @@ final class HistoryStore {
         // "item genuinely not there" and "Keychain hiccuped".
         let existing: Data?
         do {
-            existing = try Keychain.readData(account: .historyEncryptionKey)
+            existing = try Keychain.readData(account: .historyEncryptionKey, service: keychainService)
         } catch Keychain.KeychainError.itemNotFound {
             existing = nil
         } catch {
@@ -254,7 +284,7 @@ final class HistoryStore {
         let keyData = newKey.withUnsafeBytes { Data($0) }
         precondition(keyData.count == 32, "SymmetricKey size: .bits256 must yield 32 bytes")
         do {
-            try Keychain.saveData(keyData, account: .historyEncryptionKey)
+            try Keychain.saveData(keyData, account: .historyEncryptionKey, service: keychainService)
         } catch {
             throw HistoryError.encryptionFailed(underlying: error)
         }
