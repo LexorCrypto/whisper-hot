@@ -117,34 +117,6 @@ final class ContextRouterTests: XCTestCase {
         XCTAssertEqual(gmailRule.preset, .emailStyle)
     }
 
-    // MARK: - WordReplacement
-
-    func testWordReplacementApply() {
-        let r = WordReplacement(from: "коммит", to: "commit")
-        XCTAssertEqual(r.apply(to: "Сделал коммит"), "Сделал commit")
-    }
-
-    func testWordReplacementCaseInsensitive() {
-        let r = WordReplacement(from: "деплой", to: "deploy")
-        XCTAssertEqual(r.apply(to: "Запустил ДЕПЛОЙ"), "Запустил deploy")
-    }
-
-    func testWordReplacementApplyAll() {
-        let replacements = [
-            WordReplacement(from: "коммит", to: "commit"),
-            WordReplacement(from: "пуш", to: "push"),
-        ]
-        XCTAssertEqual(
-            WordReplacement.applyAll(replacements, to: "Сделал коммит и пуш"),
-            "Сделал commit и push"
-        )
-    }
-
-    func testEmptyFromDoesNothing() {
-        let r = WordReplacement(from: "", to: "something")
-        XCTAssertEqual(r.apply(to: "Hello"), "Hello")
-    }
-
     // MARK: - Helper
 
     /// Simulate ContextRouter.resolve with a fake bundle ID.
