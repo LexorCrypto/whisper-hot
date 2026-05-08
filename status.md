@@ -1,8 +1,10 @@
 # Продолжение STATUS — WhisperHot tech debt session
 
 Дата: 2026-05-08
-Версия на момент сессии: **0.6.7** (не bump'ил — это рефакторинг, не feature)
-Ветка: `main` (15 коммитов pushed на origin)
+Версия после сессии: **0.6.8** (bump'нули в конце через /document-release
+для shipping реального bug fix F015 — tilde-expansion в LocalLLMProcessor;
+CHANGELOG [0.6.8] описывает всю волну рефактора + bug fix)
+Ветка: `main` (16+ коммитов pushed на origin)
 
 ---
 
@@ -150,12 +152,18 @@
 
 ### Текущее состояние main
 - 15 коммитов запушено в origin
-- Working tree clean (этот файл — единственный untracked, личная заметка)
+- Working tree clean
 - Tests 54/54 green в release
-- VERSION = 0.6.7 (не bump'ил)
+- VERSION = 0.6.8, Info.plist build = 15
+- 0.6.8 GitHub release создан (gh release create v0.6.8)
 
 ### Стратегия для следующей сессии
-**Если хотим стабилизировать перед split'ами**: сначала backfill providers + AudioRecorder тесты (F001 продолжение).
-**Если хотим визуально разгрузить SettingsView**: F005 split — но без UI-тестов делать аккуратно с manual QA после.
-**Если хотим shipить юзерам tilde-fix**: 0.6.8 release сразу.
-**Самый ROI move**: 0.6.8 release (1 настоящий баг живёт сейчас в проде у юзеров с Local LLM конфигом) → потом F005 split.
+**Самые приоритетные оставшиеся вещи** (после shipping 0.6.8):
+1. **F005 — split SettingsView** (1007 LOC, 6 tab-файлов). Hottest churn. Без UI-тестов осторожно + manual QA после.
+2. **F006 — split MenuBarController** (~840 LOC). Сначала покрыть state machine тестами (mock AudioRecorder + TranscriptionCoordinator), ПОТОМ split. Иначе риск регресса в основном recording flow.
+3. **F001 продолжение** — Providers (URLProtocol mock), PasteService guards, TranscriptionCoordinator pipeline test, AudioRecorder lifecycle.
+
+**Опциональное низкоприоритетное**:
+- F009 enforcement: lint-rule на `L10n.lang == .ru` outside L10n.swift.
+- F029: 61 NSLog → структурированный os.Logger.
+- Streaming transcription (P3 deferred, plan в `docs/streaming-plan.md`).

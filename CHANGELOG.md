@@ -2,6 +2,92 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.6.8] — 2026-05-08
+
+Tech debt + bug fix релиз. Реальный пользовательский баг в Local LLM
+post-processing исправлен; плюс волна рефакторинга, поднявшая
+покрытие тестами с 21 до 54 кейсов.
+
+### Для пользователей
+
+- **Local LLM post-processing теперь принимает `~/...` пути.** Если у
+  тебя в Settings → Post-processing → Local LLM путь к llama-cli или
+  GGUF-модели начинается с `~` (как Settings даже показывает в плейсхолдере:
+  `~/models/llama-3.1-8b-q4.gguf`), пост-обработка раньше падала с
+  misleading «API key is not set». Теперь tilde раскрывается до
+  `/Users/<you>/...` ДО проверки существования файла, и работает.
+- **Понятные сообщения об ошибках Local LLM.** Когда llama-cli не
+  настроен или GGUF-модель не найдена, теперь видишь конкретное
+  «Local LLM binary path is not set» / «Local LLM model file not found
+  at <path>» вместо общего «API key is not set».
+- **Тоггл «Auto-switch to Offline when slow» отключается, если local
+  whisper.cpp не настроен.** Раньше можно было поставить галочку без
+  фолбэка и race-логика тихо ничего не делала. (Это уже было в 0.6.7,
+  здесь без изменений.)
+
+### Для разработчиков
+
+Эта волна — целенаправленный refactor pass по `TECH_DEBT_AUDIT.md`:
+36 находок по 9 измерениям, 13 пунктов закрыты с Codex-review каждого
+коммита. Codex поймал 7 P2-проблем по ходу, включая два РЕАЛЬНЫХ бага
+(tilde expansion + silent skip empty-paths в Local LLM).
+
+Структурные изменения:
+- `Sources/WhisperHot/Concurrency/DataBuffer.swift` (новый) — общий
+  thread-safe byte accumulator. Раньше был triplicated byte-for-byte
+  в LocalWhisperProvider, WhisperInstaller, LocalLLMProcessor. (F003)
+- `Sources/WhisperHot/Networking/Endpoints.swift` (новый) — single
+  source of truth для HTTP-эндпоинтов всех провайдеров. 7 захардкоженных
+  URL в 3 файлах сведены к одному namespace. (F011)
+- `Preferences.isLocalWhisperReady` — выделен из дубликата в
+  MenuBarController + TranscriptionCoordinator. (F004)
+- `Sources/WhisperHot/WhisperHotApp.swift` удалён — был `@main`-decorated
+  но excluded from compilation, реальный entry — `Sources/WhisperHotApp/main.swift`. (F002)
+
+Локализация:
+- 36 inline `L10n.lang == .ru ? "..." : "..."` тернариев свёрнуты в
+  32 ключа в `L10n.swift`. Grep clean: ноль остатков вне самого файла. (F009)
+- Двойные display-name'ы (English-only on enum + localized in L10n)
+  свёрнуты — `IndicatorStyle.displayName` / `AudioRetention.displayName`
+  удалены, `L10n.indicatorStyleName(_:)` / `L10n.audioRetentionName(_:)`
+  становятся single source. (F010)
+
+Errors:
+- `PostProcessingError.missingAPIKey` больше не reuse'ится для
+  «binary not found» / «model not found». Добавлены proper кейсы
+  `.missingLocalBinary(path:)` / `.missingLocalModel(path:)` с
+  диагностикой указывающей на правильный Settings-таб. (F015)
+
+Cleanup:
+- Удалён dead `hadErrorLock` в `AudioRecorder` (писали, не читали). (F008)
+- localLLM TextField bindings: raw `UserDefaults.standard` → `@AppStorage`,
+  consistency с остальным SettingsView. (F012)
+- `Preferences.Defaults` filled out: `appLanguage`, `vocabularyHints`,
+  `localLLMBinaryPath`, `localLLMModelPath` теперь там есть и
+  регистрируются в `registerDefaults()`. (F013)
+
+Testing (21 → 54 кейсов):
+- `Tests/WhisperHotTests/WordReplacementTests.swift` (новый, 12 cases) —
+  `applyAll` pipeline с пинна substring-corruption поведением (`пуш`
+  ломает `пушка` в дефолтах — задокументировано тестом). (F022)
+- `Tests/WhisperHotTests/KeychainTests.swift` (новый, 11 cases) — round-trip
+  save/read/delete через UUID-prefixed test service. Keychain получил
+  `service:` параметр на public methods + `saveRaw`/`readRaw` helpers
+  (incidentally закрыли F030 — ~50 строк дедупа). (F001a)
+- `Tests/WhisperHotTests/HistoryStoreTests.swift` (новый, 10 cases) —
+  encrypt/decrypt round-trip, orphan detection, key length validation,
+  prune-by-retention, prune-by-max-entries. HistoryStore получил
+  инжектируемый init для test isolation. (F001b)
+
+Документация:
+- `TECH_DEBT_AUDIT.md` (новый) — 36 находок с file:line цитатами,
+  ranked Critical/High/Medium/Low + Effort, top-5 outline + quick wins.
+- `status.md` (новый) — handoff заметка для будущих сессий.
+- `CLAUDE.md` — указатель на `status.md` при старте каждой сессии.
+
+Codex review: PASS на каждом из 13 коммитов рефактора. 54/54 тестов
+зелёные в release. Zero compile warnings.
+
 ## [0.6.7] — 2026-05-08
 
 Багфикс-релиз. Закрывает 3 проблемы, найденные adversarial Codex-ревью на v0.6.6.

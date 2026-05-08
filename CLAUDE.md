@@ -27,16 +27,19 @@ swift build -c release      # компиляция
 
 ## Структура проекта
 
-- `Sources/WhisperHot/` — 43 Swift файла (~8700 строк), library target WhisperHotLib
+- `Sources/WhisperHot/` — 45 Swift файлов (~7820 строк), library target WhisperHotLib
 - `Sources/WhisperHotApp/` — thin executable (main.swift)
-- `Sources/WhisperHot/MenuBarController.swift` — state machine hub (~870 строк), menubar items: Provider submenu + Auto-offline toggle (ADR-014) + Settings/History/About
+- `Sources/WhisperHot/MenuBarController.swift` — state machine hub (~840 строк), menubar items: Provider submenu + Auto-offline toggle (ADR-014) + Settings/History/About
 - `Sources/WhisperHot/ContextRouter/` — контекстный роутинг (bundle ID → preset)
 - `Sources/WhisperHot/PostProcessing/` — LLM пост-обработка (4 провайдера)
 - `Sources/WhisperHot/Indicator/` — индикаторы записи (5 стилей, включая Studio)
 - `Sources/WhisperHot/Settings/` — Preferences + SettingsView (sidebar, 5 секций)
-- `Sources/WhisperHot/Localization/` — L10n.swift (русский/английский UI)
+- `Sources/WhisperHot/Localization/` — L10n.swift (русский/английский UI, single source для всех UI-строк)
 - `Sources/WhisperHot/LocalSetup/` — WhisperInstaller + UpdateChecker
+- `Sources/WhisperHot/Concurrency/` — DataBuffer (NSLock-guarded byte accumulator для subprocess pipe drain)
+- `Sources/WhisperHot/Networking/` — Endpoints (single source для всех HTTP URL провайдеров)
 - `Sources/WhisperHot/Transcription/FallbackTranscriptionService.swift` — offline fallback wrapper, опциональный timeout race (ADR-014)
+- `Tests/WhisperHotTests/` — 5 файлов / 54 теста: Keychain, HistoryStore (encryption), WordReplacement, ContextRouter, FallbackTranscriptionService
 - `Resources/Sounds/` — кастомные AIFF звуки
 - `Resources/WhisperHot.icns` — иконка приложения (Voice → Text logo)
 - `docs/logo-concepts/` — design exploration: 6 концептов + showcase HTML

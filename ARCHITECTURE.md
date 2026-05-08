@@ -1,7 +1,9 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 43 Swift файла, ~8700 строк. Три SwiftPM target:
+приложение. 45 Swift файлов, ~7820 строк (после волны рефакторинга
+post-v0.6.7: дедупликация DataBuffer × 3, сворачивание 36 inline
+L10n-тернариев в keys, центрозвезда provider URLs). Три SwiftPM target:
 `WhisperHotLib` (library), `WhisperHot` (thin executable),
 `WhisperHotTests` (unit tests с @testable import). AppKit — основная оболочка,
 SwiftUI живёт внутри Settings, Onboarding, History и recording
@@ -104,6 +106,14 @@ Sources/WhisperHot/
 │
 ├── LaunchAtLogin/
 │   └── LaunchAtLoginController.swift  SMAppService.mainApp wrapper
+│
+├── Concurrency/
+│   └── DataBuffer.swift            Thread-safe NSLock-guarded byte accumulator
+│                                   (shared by всех subprocess pipe drain handlers)
+│
+├── Networking/
+│   └── Endpoints.swift             Single source of truth для HTTP-эндпоинтов
+│                                   (OpenAI/OpenRouter/Groq/PolzaAI, stt + chat)
 │
 └── Privacy/
     └── AudioRetentionSweeper.swift    Startup sweep + shutdown wipe

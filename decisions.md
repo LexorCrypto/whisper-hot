@@ -287,7 +287,9 @@
 - **App Sandbox.** Несовместим с `Process` для brew/whisper/llama. Не активирован.
 - **Apple Developer ID + нотаризация.** Убрал бы проблему с Gatekeeper ($99/год). Не приоритет для personal build.
 - **Autoupdate (Sparkle).** Проверка обновлений есть, автоустановка — нет.
-- **Дальнейший split MenuBarController.** ~870 строк — всё ещё много. Можно выделить MenuBuilder, RecordingStateMachine.
+- **Дальнейший split MenuBarController.** ~840 строк — всё ещё много. Можно выделить MenuBuilder, RecordingStateMachine, HotkeyTransport. План в `TECH_DEBT_AUDIT.md` F006.
+- **Раскол SettingsView.** 1007 строк, hottest churn-файл. План — 6 tab-файлов (`SettingsRecordingTab`, `SettingsProvidersTab`, etc.) в `TECH_DEBT_AUDIT.md` F005.
+- **Backfill major test suites.** Providers (URLProtocol mock), AudioRecorder lifecycle, PasteService guards, TranscriptionCoordinator pipeline. Покрытие на сейчас: 54 теста, ContextRouter/FallbackTranscriptionService/WordReplacement/Keychain/HistoryStore зелёные. План в `TECH_DEBT_AUDIT.md` F001.
 
 ---
 
