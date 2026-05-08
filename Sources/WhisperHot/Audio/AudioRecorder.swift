@@ -25,9 +25,6 @@ final class AudioRecorder: NSObject {
     /// The recording continues but the audio may be incomplete.
     var onRecordingError: ((String) -> Void)?
 
-    /// Tracks whether any error occurred during the current recording session.
-    private let hadErrorLock = OSAllocatedUnfairLock<Bool>(initialState: false)
-
     private let engine = AVAudioEngine()
 
     // OSAllocatedUnfairLock is the canonical macOS fast lock with priority inheritance.
@@ -214,7 +211,6 @@ final class AudioRecorder: NSObject {
 
         guard status != .error, error == nil else {
             NSLog("WhisperHot: converter error")
-            hadErrorLock.withLock { $0 = true }
             let msg = error?.localizedDescription ?? "unknown converter error"
             DispatchQueue.main.async { [weak self] in self?.onRecordingError?(msg) }
             return
@@ -229,7 +225,6 @@ final class AudioRecorder: NSObject {
                 try file.write(from: outBuffer)
             } catch {
                 NSLog("WhisperHot: audio write error")
-                self.hadErrorLock.withLock { $0 = true }
                 let msg = error.localizedDescription
                 DispatchQueue.main.async { [weak self] in self?.onRecordingError?(msg) }
             }
