@@ -26,12 +26,16 @@ Icon?
 *.swp
 *.swo
 
-# Local Claude Code config (permission rules, local overrides)
+# Local Claude Code config (permission rules, local overrides, MCP servers)
 .claude/
 .cursor/
+.mcp.json
 
 # Codex session id (machine-local, not shareable)
 .context/
+
+# Claude Code skill artifacts (session reports, etc.)
+session-report-*.html
 
 # Secrets — API keys should live in the macOS Keychain. If any of these
 # files ever show up in the tree, block them before they can be committed.

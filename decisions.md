@@ -287,7 +287,7 @@
 - **App Sandbox.** Несовместим с `Process` для brew/whisper/llama. Не активирован.
 - **Apple Developer ID + нотаризация.** Убрал бы проблему с Gatekeeper ($99/год). Не приоритет для personal build.
 - **Autoupdate (Sparkle).** Проверка обновлений есть, автоустановка — нет.
-- **Дальнейший split MenuBarController.** 828 строк — всё ещё много. Можно выделить MenuBuilder, RecordingStateMachine.
+- **Дальнейший split MenuBarController.** ~870 строк — всё ещё много. Можно выделить MenuBuilder, RecordingStateMachine.
 
 ---
 

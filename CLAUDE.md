@@ -13,9 +13,9 @@ swift build -c release      # компиляция
 
 ## Структура проекта
 
-- `Sources/WhisperHot/` — 43 Swift файла (~7710 строк), library target WhisperHotLib
+- `Sources/WhisperHot/` — 43 Swift файла (~8700 строк), library target WhisperHotLib
 - `Sources/WhisperHotApp/` — thin executable (main.swift)
-- `Sources/WhisperHot/MenuBarController.swift` — state machine hub (~840 строк), menubar items: Provider submenu + Auto-offline toggle (ADR-014) + Settings/History/About
+- `Sources/WhisperHot/MenuBarController.swift` — state machine hub (~870 строк), menubar items: Provider submenu + Auto-offline toggle (ADR-014) + Settings/History/About
 - `Sources/WhisperHot/ContextRouter/` — контекстный роутинг (bundle ID → preset)
 - `Sources/WhisperHot/PostProcessing/` — LLM пост-обработка (4 провайдера)
 - `Sources/WhisperHot/Indicator/` — индикаторы записи (5 стилей, включая Studio)
