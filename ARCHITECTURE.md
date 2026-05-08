@@ -1,9 +1,9 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 45 Swift файлов, ~7820 строк (после волны рефакторинга
-post-v0.6.7: дедупликация DataBuffer × 3, сворачивание 36 inline
-L10n-тернариев в keys, центрозвезда provider URLs). Три SwiftPM target:
+приложение. 45 Swift файлов, ~8130 строк (после v0.6.9: добавлены
+sleep/wake recovery, per-session audio primitives, ephemeral
+URLSession). Три SwiftPM target:
 `WhisperHotLib` (library), `WhisperHot` (thin executable),
 `WhisperHotTests` (unit tests с @testable import). AppKit — основная оболочка,
 SwiftUI живёт внутри Settings, Onboarding, History и recording
@@ -112,8 +112,11 @@ Sources/WhisperHot/
 │                                   (shared by всех subprocess pipe drain handlers)
 │
 ├── Networking/
-│   └── Endpoints.swift             Single source of truth для HTTP-эндпоинтов
-│                                   (OpenAI/OpenRouter/Groq/PolzaAI, stt + chat)
+│   ├── Endpoints.swift             Single source of truth для HTTP-эндпоинтов
+│   │                               (OpenAI/OpenRouter/Groq/PolzaAI, stt + chat)
+│   └── HTTPClient.swift            Shared ephemeral URLSession для всех cloud
+│                                   провайдеров; `timeoutIntervalForResource = 180s`,
+│                                   `waitsForConnectivity = false` (ADR-015)
 │
 └── Privacy/
     └── AudioRetentionSweeper.swift    Startup sweep + shutdown wipe
@@ -137,8 +140,9 @@ MenuBarController.toggleRecording
 AudioRecorder.startRecording
    │  AVAudioEngine.inputNode.installTap (real-time thread)
    │    └→ AVAudioConverter → 16 kHz mono Int16 PCM
-   │         └→ writerQueue.async → AVAudioFile.write
-   │  tapGroup.enter/leave для учёта in-flight callback'ов
+   │         └→ session.writerQueue.async → AVAudioFile.write
+   │  session.tapGroup.enter/leave для учёта in-flight callback'ов
+   │  per-session DispatchGroup + DispatchQueue (ADR-015)
    │  OSAllocatedUnfairLock на session + RMS
    ▼
 Пользователь говорит. IndicatorViewModel поллит currentRMS на 20 Hz.
@@ -151,18 +155,24 @@ MenuBarController.stopRecordingFromMenu
    │  играет stop chime
    ▼
 AudioRecorder.stopRecording
-   │  removeTap; tapGroup.wait; writerQueue.sync {}
-   │  clear session; возвращает WAV URL
+   │  removeTap; engine.stop; capture session + clear slot
+   │  finished.tapGroup.wait; finished.writerQueue.sync {}
+   │  возвращает WAV URL (per-session primitives, ADR-015)
    ▼
 MenuBarController.kickOffTranscription
    │  state: .recording → .transcribing
+   │  cancel any prior transcriptionTask; bump epoch (ADR-015)
    │  строит service через makeTranscriptionService(for: Preferences.provider)
    │  снапшотит PostProcessingOptions + LLMPostProcessor если включён
    │
-   │  Task.detached:
+   │  transcriptionTask = Task.detached:
    │   ├─ service.transcribe(url, options)  [network / subprocess]
    │   ├─ опциональный postProcessor.process(raw.text) [network]
-   │   └─ await self?.finishTranscription(outcome:)   [main actor hop]
+   │   └─ await self?.deliverTranscriptionResult(outcome:epoch:)
+   │
+   │  deliverTranscriptionResult (main actor):
+   │   ├─ epoch != current → drop (stale: cancelled/superseded run)
+   │   └─ epoch ok → finishTranscription(outcome:)
    │
    ▼
 MenuBarController.finishTranscription (main actor)

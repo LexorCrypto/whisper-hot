@@ -4,7 +4,7 @@
 >
 > Формат записи: **Контекст → Решение → Обоснование → Последствия → Альтернативы**.
 >
-> Версия приложения на момент ревизии: **0.6.5**.
+> Версия приложения на момент ревизии: **0.6.9**.
 >
 > Автор: Aleksei Supilin. Лицензия: Apache 2.0.
 
@@ -278,6 +278,47 @@
 **Гард для local-primary.** Если пользователь выбрал `provider == .localWhisper`, тоггл игнорируется — иначе timer на медленной локальной транскрипции запустит дубликат той же local-задачи. Гард в `TranscriptionCoordinator.fromPreferences`: `timeoutRaceEligible = provider != .localWhisper && Preferences.autoOfflineOnTimeout`.
 
 **Не Supersedes ADR-013.** ADR-013 запрещает silent fallback на auth/HTTP по умолчанию. ADR-014 разрешает opt-in fallback на latency, с явным acknowledgement что timeout-окно может частично перекрыть auth/HTTP-окно. Разные классы ошибок, разные политики, явный пользовательский opt-in.
+
+---
+
+## ADR-015 — Sleep/wake recovery: task ownership, ephemeral URLSession, per-session audio primitives
+
+**Контекст.** Пользователь отрепортил «приложение виснет после возврата Mac'а из sleep, помогает только перезапуск». Не всегда. Конфигурация — cloud STT, Auto-offline OFF, cloud post-processing. Grep по коду подтвердил: до v0.6.9 НИ ОДНОГО observer'а на `NSWorkspace.willSleepNotification` / `didWakeNotification` нигде. Cross-консультация с Codex выявила три каскадных дефекта:
+
+1. **`Task.detached` для транскрипции запускался без сохранения handle.** Никто не мог отменить stranded request. И stale Task мог дойти до `finishTranscription` уже после новой записи, обнулив state посреди работы.
+2. **`URLSession.shared` с дефолтным `timeoutIntervalForResource = 7 days`.** Request, у которого ядро снесло TCP-сокет во время сна, мог жить неделю без surfacing ошибки.
+3. **`AudioRecorder.stopRecording()` ждал `tapGroup.wait()` и `writerQueue.sync {}` на main thread.** Если callback или write-блок зависли во время suspend, main thread замораживался намертво.
+
+**Решение.** Закрыть все три дефекта пятью атомарными коммитами в строгом порядке риска (наименее рискованное — первым). Sleep/wake становится first-class lifecycle событием с дедицированными observer'ами в `MenuBarController`.
+
+1. **Step 1 — instrumentation.** Phase markers в `TranscriptionCoordinator.run` (`stt-begin/end/failed`, `pp-begin/end (ok|failed)`), `didSet` log на `RecorderState`, log-only sleep/wake observer'ы. Format-string injection guard для error.localizedDescription через `"%@"`.
+2. **Step 2 — task ownership + epoch guard.** `transcriptionTask: Task<Void, Never>?` хранит handle. `transcriptionEpoch: UInt64` инкремент на `kickOffTranscription`; запускающийся Task захватывает свой epoch, при возврате `deliverTranscriptionResult(outcome:epoch:)` сравнивает с текущим — mismatch ⇒ дроп до `finishTranscription`.
+3. **Step 3 — sleep/wake actions.** `handleWorkspaceWillSleep` для `.transcribing` отменяет task + бампает epoch + обнуляет UI bookkeeping (WAV оставляется на диске, retention sweep управляет). `handleWorkspaceDidWake` делает `syncHotkeyBindings()` против stale Carbon `EventHotKeyRef`, с guard на `isHotkeyRecorderArmed` чтобы не ломать Settings → Hotkey recorder.
+4. **Step 4 — ephemeral URLSession.** Новый `Sources/WhisperHot/Networking/HTTPClient.swift` экспортит один shared `URLSession`: `URLSessionConfiguration.ephemeral`, `waitsForConnectivity = false`, `timeoutIntervalForRequest = 60`, **`timeoutIntervalForResource = 180`**. Все три cloud провайдера (`OpenAICompatibleSTTProvider`, `OpenRouterAudioProvider`, `LLMPostProcessor`) используют как default. DI preserved.
+5. **Step 5 — `AudioRecorder.resetAfterWake()` + per-session `tapGroup`/`writerQueue`/`id`.** `ActiveSession` теперь владеет своими DispatchGroup и DispatchQueue (label `*.writer.<id>`); shared instance-level primitives удалены. Tap closure захватывает session **strongly** — stale callback не дотянется до WAV новой записи. `processTapBuffer(buffer:session:)` гейтит ВСЁ (RMS update + write) на `isLive = sessionLock.withLock { $0?.id == session.id }`. `resetAfterWake()` — best-effort non-blocking teardown: removes tap, stops engine, clears slot, сбрасывает `isRecording`. **Никогда не ждёт** `tapGroup` / `writerQueue`. Вызывается на `willSleep` для `.recording` и defensive на `didWake` для dark-wake / hibernate path.
+
+**Обоснование.**
+
+- **Atomic commits в порядке риска.** `/codex consult` явно рекомендовал не делать «shotgun fix», а разбить на 5 шагов так, чтобы audio reset (самый рискованный, без UI/state-machine тестов) был последним. Каждый шаг прошёл `codex review` отдельно — Codex поймал 7 P1/P2 в трёх проходах Step 5: stale tap → successor WAV; controller state desync after dark-wake; shared `tapGroup`/`writerQueue` poisoned by wedged callback; late tap writes after stop drain.
+- **Per-session primitives — корневой фикс audio teardown deadlock.** Shared `tapGroup`/`writerQueue` означали что заклинивший callback из abandoned session отравлял `wait()` следующего `stopRecording()` навсегда. С per-session DispatchGroup новый `stopRecording` дренит ТОЛЬКО свою группу, которая чиста независимо от того, что случилось со старой.
+- **Strong session capture в tap closure — корневой фикс race в processTapBuffer.** Альтернатива через `[weak self]` с lookup в `sessionLock` создавала окно где stale callback мог прочитать НОВУЮ session и записать buffer старой записи в новый WAV. Strong capture гарантирует callback видит свою session.
+- **`isLive` gate перед write — защита WAV от late tap.** Callback queued AVAudioEngine'ом ДО `removeTap` может фильнуть после `stopRecording` уже отдал WAV транскрибатору. Без guard'а write мог бы корраптить файл mid-read.
+- **`timeoutIntervalForResource = 180s` — safety cap, не replacement.** Per-request `URLRequest.timeoutInterval` остаются (60s OpenAI, 120s OpenRouter, 60s LLM). Session-level cap — defence-in-depth: если per-request не сработал (URL-сессия залипла на dead socket post-wake), хотя бы 3 минуты будет потолком вместо 7 дней.
+- **WAV не удаляется на sleep cancellation.** Match-ит `.failure` path `finishTranscription`. Пользователь с `.untilQuit` / `.oneHour` / `.forever` не теряет единственную копию аудио из-за прерывания сном.
+
+**Последствия.**
+
+- Sleep/wake более не теряет state приложения. UI после wake идёт через `idle` baseline.
+- Cloud STT / LLM cleanup залипают максимум на 180 секунд вместо `~∞`.
+- AudioRecorder теперь имеет публичный API `resetAfterWake()` — отдельный от `stopRecording()` контракт. `stopRecording` остаётся для clean teardown с гарантированным flush WAV header'а; `resetAfterWake` — для recovery где flush не critical, и main thread нельзя блокировать.
+- `Process`-обёртки в `LocalWhisperProvider` / `LocalLLMProcessor` НЕ реагируют на `Task.cancel()` (continuation без cancellation handler). Subprocess продолжит работать после willSleep cancellation. Заметно только при выборе Local Whisper / Local LLM (cloud-only пользователей не касается). Tracked для отдельного фикса.
+- Нет UI / state-machine тестов на `MenuBarController`. Sleep/wake handler'ы протестированы в release build manual smoke pass'ом, не automated tests. Project status.md F006 фиксирует gap.
+
+**Альтернативы.**
+
+- *Sample-driven fix.* Подождать `sample WhisperHot 10` от пользователя при следующем freeze, сделать минимальный фикс под конкретный стек. Codex рекомендовал НЕ ждать sample: архитектурные дефекты (no task ownership, no sleep/wake handling, shared primitives) — реальные баги независимо от того, какой именно стреляет. Sample всё равно стоит собрать как verification.
+- *Cancellation handler в `LocalWhisperProvider` / `LocalLLMProcessor`.* `withCheckedThrowingContinuation { ... }` → `withTaskCancellationHandler`, который SIGTERM'ит subprocess. Out-of-scope для этого релиза (большой переработки subprocess lifecycle), но логичный next step.
+- *Полный `engine.reset()` на didWake.* AVFoundation предлагает `engine.reset()`. Не используем — он может сам блокироваться на CoreAudio teardown в zombie-state. Наш `resetAfterWake()` обходится `removeTap + stop + clear slot` без `reset()`.
 
 ---
 

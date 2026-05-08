@@ -27,9 +27,9 @@ swift build -c release      # компиляция
 
 ## Структура проекта
 
-- `Sources/WhisperHot/` — 45 Swift файлов (~7820 строк), library target WhisperHotLib
+- `Sources/WhisperHot/` — 45 Swift файлов (~8130 строк), library target WhisperHotLib
 - `Sources/WhisperHotApp/` — thin executable (main.swift)
-- `Sources/WhisperHot/MenuBarController.swift` — state machine hub (~840 строк), menubar items: Provider submenu + Auto-offline toggle (ADR-014) + Settings/History/About
+- `Sources/WhisperHot/MenuBarController.swift` — state machine hub (~1030 строк), menubar items: Provider submenu + Auto-offline toggle (ADR-014) + Settings/History/About; владеет `transcriptionTask` + epoch guard и sleep/wake observers (ADR-015)
 - `Sources/WhisperHot/ContextRouter/` — контекстный роутинг (bundle ID → preset)
 - `Sources/WhisperHot/PostProcessing/` — LLM пост-обработка (4 провайдера)
 - `Sources/WhisperHot/Indicator/` — индикаторы записи (5 стилей, включая Studio)
@@ -37,7 +37,8 @@ swift build -c release      # компиляция
 - `Sources/WhisperHot/Localization/` — L10n.swift (русский/английский UI, single source для всех UI-строк)
 - `Sources/WhisperHot/LocalSetup/` — WhisperInstaller + UpdateChecker
 - `Sources/WhisperHot/Concurrency/` — DataBuffer (NSLock-guarded byte accumulator для subprocess pipe drain)
-- `Sources/WhisperHot/Networking/` — Endpoints (single source для всех HTTP URL провайдеров)
+- `Sources/WhisperHot/Networking/` — Endpoints (single source URLs) + HTTPClient (ephemeral URLSession с bounded `timeoutIntervalForResource = 180s`, ADR-015)
+- `Sources/WhisperHot/Audio/AudioRecorder.swift` — AVAudioEngine wrapper; `ActiveSession` владеет per-session `tapGroup` / `writerQueue` / `id`, чтобы wedged callback из abandoned session не отравлял следующий `stopRecording()` (ADR-015). Метод `resetAfterWake()` — non-blocking teardown для wake-recovery path.
 - `Sources/WhisperHot/Transcription/FallbackTranscriptionService.swift` — offline fallback wrapper, опциональный timeout race (ADR-014)
 - `Tests/WhisperHotTests/` — 5 файлов / 54 теста: Keychain, HistoryStore (encryption), WordReplacement, ContextRouter, FallbackTranscriptionService
 - `Resources/Sounds/` — кастомные AIFF звуки

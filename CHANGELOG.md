@@ -2,6 +2,138 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.6.9] — 2026-05-09
+
+Stability релиз. Закрывает класс багов «приложение виснет после возврата
+Mac'а из sleep mode, помогает только перезапуск». Пять атомарных коммитов,
+каждый прошёл Codex review.
+
+### Для пользователей
+
+- **Менюбар-приложение больше не зависает после возврата из sleep.** Если
+  раньше после того как Mac уходил в сон во время работы или сразу после
+  записи, иконка переставала реагировать и приходилось перезапускать
+  WhisperHot — теперь это починено. На `willSleep` приложение отменяет
+  активную транскрипцию и сбрасывает audio engine; на `didWake`
+  перерегистрирует Carbon hotkey и делает defensive cleanup на случай
+  dark-wake / hibernate сценариев когда `willSleep` вообще не сработал.
+- **Cloud STT и LLM-cleanup больше не залипают навечно при потере сети
+  во время сна.** Раньше URLSession.shared имел `timeoutIntervalForResource
+  = 7 days` — request, у которого ядро снесло TCP-сокет во время сна,
+  мог жить неделю без ошибки, держа стейт `.transcribing` и блокируя
+  hotkey. Все cloud-провайдеры (OpenAI / OpenRouter / Groq / PolzaAI / LLM
+  cleanup) переведены на ephemeral URLSession с
+  `timeoutIntervalForResource = 180s` и `waitsForConnectivity = false`.
+- **Если запись или транскрипция прервались сном, WAV не удаляется.**
+  Файл остаётся на диске, его подберёт retention sweep по твоей политике
+  (`.untilQuit` / `.oneHour` / `.forever` теперь не теряют единственную
+  копию аудио из-за случайного сна).
+
+### Для разработчиков
+
+Корневой sympom — никакой sleep/wake handling в коде вообще не было
+(grep'ом подтверждено: ноль observer'ов на NSWorkspace.willSleep /
+didWake до этого релиза). Кросс-консультация с Codex выявила три
+архитектурных дефекта, которые стреляли каскадом:
+
+1. `Task.detached` для транскрипции запускался **без сохранения handle**.
+   Никто не мог отменить stranded request. И stale Task мог дойти до
+   `finishTranscription` уже после того как пользователь начал новую
+   запись, обнулив state посреди работы.
+2. `URLSession.shared` с дефолтным 7-дневным `timeoutIntervalForResource`.
+3. `AudioRecorder.stopRecording()` ждал `tapGroup.wait()` и
+   `writerQueue.sync {}` на main thread — если callback или write
+   wedged во время suspend, main thread зависал намертво.
+
+Решение разбито на 5 атомарных коммитов:
+
+**Step 1 — instrumentation (`ef5ad33`)**
+- `didSet` observer на `RecorderState` логирует все переходы.
+- `Task.detached` body обёрнут в launching/returned NSLog с epoch и
+  outcome tag.
+- `NSWorkspace.willSleep` / `didWake` observers — пока только NSLog,
+  separate `workspaceTokens` array (NSWorkspace.shared.notificationCenter
+  ≠ NotificationCenter.default; removeObserver на «не своём» центре
+  silently no-op).
+- Phase markers в `TranscriptionCoordinator.run`:
+  `stt-begin / stt-end / stt-failed / pp-begin / pp-end (ok|failed)`.
+- Codex поймал format-string injection: `error.localizedDescription`
+  и `ppOptions.model` теперь идут через `"%@"`, а не interpolated
+  format string (provider error body может содержать `%`-последовательности
+  которые NSLog трактует как specifiers).
+
+**Step 2 — task ownership + epoch guard (`459aeaa`)**
+- `private var transcriptionTask: Task<Void, Never>?` — handle хранится,
+  доступен для `cancel()`.
+- `private var transcriptionEpoch: UInt64` — инкремент на каждый
+  `kickOffTranscription`. Запускающийся Task захватывает свой epoch,
+  при возврате `deliverTranscriptionResult(outcome:epoch:)` сравнивает
+  с текущим. Mismatch ⇒ результат от cancelled / superseded run, дропаем
+  до того как он зайдёт в `finishTranscription`.
+
+**Step 3 — sleep/wake actions (`19744b5`)**
+- `handleWorkspaceWillSleep`: для `.transcribing` отменяет task, бампает
+  epoch, обнуляет UI bookkeeping. WAV оставляется на диске
+  (matches `.failure` path — retention sweep управляет).
+- `handleWorkspaceDidWake`: `syncHotkeyBindings()` против stale
+  Carbon `EventHotKeyRef`, с guard на `isHotkeyRecorderArmed` чтобы не
+  ломать UI Settings → Hotkey recorder если sleep случился прямо во
+  время capture.
+- Codex поймал две P2: retention bypass (теперь не удаляем WAV) +
+  hotkey-armed guard.
+
+**Step 4 — ephemeral URLSession (`1f9d287`)**
+- Новый файл `Sources/WhisperHot/Networking/HTTPClient.swift`. Один
+  shared URLSession для всех cloud-провайдеров:
+  `URLSessionConfiguration.ephemeral`, `waitsForConnectivity = false`,
+  `timeoutIntervalForRequest = 60`, `timeoutIntervalForResource = 180`.
+- Per-request `URLRequest.timeoutInterval` overrides сохранены
+  (60s OpenAI / 120s OpenRouter / 60s LLM). Session-level
+  `timeoutIntervalForResource` — safety cap на случай если
+  per-request override не сработал.
+- DI preserved: тесты могут инжектить `urlSession:` параметром
+  (URLProtocol stubs).
+- `LocalWhisperProvider` / `LocalLLMProcessor` не затронуты — они
+  через `Process`, не URLSession.
+
+**Step 5 — AudioRecorder.resetAfterWake + per-session primitives (`67a3485`)**
+- `ActiveSession` теперь владеет своими `tapGroup: DispatchGroup` и
+  `writerQueue: DispatchQueue` (label `*.writer.<id>`). Раньше они
+  были shared на инстанс — и заклинивший callback из abandoned session
+  отравлял `tapGroup.wait()` следующего `stopRecording()` навсегда.
+- `ActiveSession.id: UInt64` — монотонный ID. Tap closure захватывает
+  session **strongly**: stale callback из старой сессии не дотянется
+  до WAV новой записи.
+- `processTapBuffer(buffer:session:)` гейтит ВСЁ (RMS update + write
+  enqueue) на `isLive = sessionLock.withLock { $0?.id == session.id }`.
+  Late callback после `stopRecording` / `resetAfterWake` бейлит до
+  записи в файл, который caller уже отдал транскрибатору.
+- `AudioRecorder.resetAfterWake()`: best-effort non-blocking teardown.
+  Removes tap, stops engine, clears slot, resets isRecording. **Никогда
+  не ждёт** `tapGroup` / `writerQueue` (это и есть suspect freeze
+  site). Idempotent. Orphan WAV остаётся retention sweep'у.
+- `MenuBarController.handleWorkspaceWillSleep`/`handleWorkspaceDidWake`
+  теперь обрабатывают `.recording` (через `resetAfterWake`) и
+  dark-wake / hibernate path (когда `willSleep` не сработал).
+  Helper `resetControllerStateToIdle()` shared между ветками.
+- `stopRecording` reorder: capture session + clear slot **до**
+  `wait()` — late callback наблюдает cleared slot и бейлит.
+- Codex поймал 4 P1/P2 в три прохода: stale tap → successor WAV;
+  controller state desync after dark-wake; shared `tapGroup`/`writerQueue`
+  poisoned by wedged callback; late tap writes after stop.
+
+### Известные ограничения (намеренно вне scope)
+
+- `LocalWhisperProvider` / `LocalLLMProcessor` запускают `Process`
+  внутри `withCheckedThrowingContinuation` без cancellation handler.
+  `Task.cancel()` пометит Swift Task cancelled, но subprocess
+  продолжит работать. Заметно только если пользователь — на Local
+  Whisper / Local LLM (cloud-only пользователей это не касается).
+  Tracked для отдельного фикса.
+- Нет UI / state-machine тестов на `MenuBarController`. Project
+  status.md F006 фиксирует этот пробел; до его закрытия рефакторы
+  state machine идут под manual smoke pass.
+
 ## [0.6.8] — 2026-05-08
 
 Tech debt + bug fix релиз. Реальный пользовательский баг в Local LLM
