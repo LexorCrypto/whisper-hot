@@ -38,6 +38,8 @@ struct SettingsView: View {
     @AppStorage(Preferences.Key.postProcessingModelGroq) private var ppModelGroq: String = Preferences.Defaults.postProcessingModelGroq
     @AppStorage(Preferences.Key.customEndpointURL) private var customEndpointURL: String = Preferences.Defaults.customEndpointURL
     @AppStorage(Preferences.Key.customEndpointModel) private var customEndpointModel: String = Preferences.Defaults.customEndpointModel
+    @AppStorage(Preferences.Key.localLLMBinaryPath) private var localLLMBinaryPath: String = ""
+    @AppStorage(Preferences.Key.localLLMModelPath) private var localLLMModelPath: String = ""
     @AppStorage(Preferences.Key.appLanguage) private var appLanguage: AppLanguage = .ru
 
     @State private var launchAtLoginEnabled: Bool = LaunchAtLoginController.isEnabled
@@ -619,17 +621,11 @@ struct SettingsView: View {
                 .foregroundColor(.secondary)
         case .localLLM:
             TextField(L10n.lang == .ru ? "Путь к llama-cli" : "llama-cli path",
-                      text: Binding(
-                        get: { UserDefaults.standard.string(forKey: Preferences.Key.localLLMBinaryPath) ?? "" },
-                        set: { UserDefaults.standard.set($0, forKey: Preferences.Key.localLLMBinaryPath) }
-                      ),
+                      text: $localLLMBinaryPath,
                       prompt: Text("/opt/homebrew/bin/llama-cli"))
                 .textFieldStyle(.roundedBorder)
             TextField(L10n.lang == .ru ? "Путь к GGUF модели" : "GGUF model path",
-                      text: Binding(
-                        get: { UserDefaults.standard.string(forKey: Preferences.Key.localLLMModelPath) ?? "" },
-                        set: { UserDefaults.standard.set($0, forKey: Preferences.Key.localLLMModelPath) }
-                      ),
+                      text: $localLLMModelPath,
                       prompt: Text("~/models/llama-3.1-8b-q4.gguf"))
                 .textFieldStyle(.roundedBorder)
             Text(L10n.lang == .ru
