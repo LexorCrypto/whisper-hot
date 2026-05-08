@@ -315,32 +315,79 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func handleWorkspaceWillSleep() {
         NSLog("WhisperHot: workspace willSleep (state=\(state), startingRec=\(isStartingRecording))")
 
-        if state == .transcribing {
+        switch state {
+        case .transcribing:
             transcriptionTask?.cancel()
             transcriptionTask = nil
             transcriptionEpoch &+= 1
-            state = .idle
-            recordMenuItem?.title = L10n.startRecording
-            indicatorController.hide()
-            recordingTarget = nil
-            currentRecordingURL = nil
-            // Leave the WAV on disk and let the retention sweep manage it —
-            // matches the `.failure` path of `finishTranscription`. Deleting
-            // unconditionally here would override a user who picked
-            // `.untilQuit` / `.oneHour` / `.forever` and lose the only audio
-            // copy of a transcription that was simply interrupted by sleep.
-            AudioRetentionSweeper.activeRecordingURL = nil
+            // Leave the WAV on disk (resetControllerStateToIdle clears the
+            // active-recording marker but does not remove the file) — same
+            // rationale as the `.failure` path of `finishTranscription`.
+            // A user who picked `.untilQuit` / `.oneHour` / `.forever`
+            // shouldn't lose the only audio copy because sleep interrupted
+            // post-processing.
+            resetControllerStateToIdle()
+
+        case .recording:
+            // Mid-recording sleep. Use the non-blocking reset path —
+            // `stopRecording()` waits on `tapGroup` / `writerQueue` from
+            // the main thread, which is the suspected freeze site if a
+            // tap callback got wedged during suspend. `resetAfterWake()`
+            // never waits, so this handler returns promptly even on a
+            // misbehaving engine. The orphan WAV is retained on disk
+            // (same rationale as the .transcribing branch).
+            audioRecorder.resetAfterWake()
+            resetControllerStateToIdle()
+
+        case .idle:
+            break
         }
     }
 
-    /// macOS just woke. Re-register the Carbon hotkey to defend against a
-    /// stale `EventHotKeyRef` after suspend, and let `syncHotkeyBindings`
-    /// also re-arm Fn if that's the active transport. Audio engine reset
-    /// is deferred to Step 5 — touching AVAudioEngine here without the
-    /// non-blocking reset path could hit the same teardown deadlock we're
-    /// trying to dig out of.
+    /// UI / bookkeeping side of the recording cleanup, shared between the
+    /// `.recording` willSleep branch and the dark-wake fallback in
+    /// `handleWorkspaceDidWake`. Does NOT touch the audio recorder — call
+    /// `audioRecorder.resetAfterWake()` first if the recorder side also
+    /// needs to be cleared.
+    private func resetControllerStateToIdle() {
+        state = .idle
+        recordMenuItem?.title = L10n.startRecording
+        configureButton(recording: false)
+        indicatorController.hide()
+        recordingTarget = nil
+        currentRecordingURL = nil
+        AudioRetentionSweeper.activeRecordingURL = nil
+    }
+
+    /// macOS just woke. Belt-and-suspenders cleanup of any AVAudioEngine
+    /// state that survived sleep (the willSleep handler does the bulk of
+    /// the work, but a sleep that didn't go through willSleep — e.g. some
+    /// dark-wake / hibernate edge cases — can leave the engine in a
+    /// zombie state). Then re-register the Carbon hotkey to defend
+    /// against a stale `EventHotKeyRef` after suspend.
     private func handleWorkspaceDidWake() {
         NSLog("WhisperHot: workspace didWake (state=\(state), startingRec=\(isStartingRecording))")
+        // Idempotent — no-op if no session is active, otherwise nukes a
+        // possibly-zombie engine without waiting on tap/writer queues.
+        audioRecorder.resetAfterWake()
+        // Dark-wake / hibernate path: the system can wake without firing
+        // willSleep first, so the controller may still be sitting in
+        // .recording (or .transcribing) with bookkeeping intact even
+        // though the recorder side has just been wiped. Mirror the
+        // willSleep cleanup so the UI doesn't lie about a "live" recording
+        // that no longer exists, and so the next stopRecording call won't
+        // throw `notRecording`.
+        switch state {
+        case .recording:
+            resetControllerStateToIdle()
+        case .transcribing:
+            transcriptionTask?.cancel()
+            transcriptionTask = nil
+            transcriptionEpoch &+= 1
+            resetControllerStateToIdle()
+        case .idle:
+            break
+        }
         // Don't fight the Settings hotkey-recorder UI: handleRecorderArm()
         // intentionally unregistered Carbon for the capture session. If
         // sleep happens mid-capture, leave the recorder armed and let
