@@ -10,15 +10,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             previousApp = front
+        } else {
+            previousApp = nil
         }
 
         if window == nil {
             buildWindow()
         }
 
-        // Temporarily become a regular app so the menu bar shows
-        // "WhisperHot" next to the Apple logo and the window gets
-        // proper focus behavior. Reverted on close.
+        // Keep this defensive for older builds launched as accessory-only;
+        // the main-window app path already runs as a regular Dock app.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -55,10 +56,6 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         NotificationCenter.default.post(name: .whisperHotSettingsWillClose, object: nil)
-
-        // Return to accessory mode so WhisperHot disappears from the Dock
-        // and menu bar, restoring the menu-bar-only behavior.
-        NSApp.setActivationPolicy(.accessory)
 
         let ourPID = ProcessInfo.processInfo.processIdentifier
         if NSWorkspace.shared.frontmostApplication?.processIdentifier == ourPID {

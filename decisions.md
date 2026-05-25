@@ -4,7 +4,7 @@
 >
 > Формат записи: **Контекст → Решение → Обоснование → Последствия → Альтернативы**.
 >
-> Версия приложения на момент ревизии: **0.6.9**.
+> Версия приложения на момент ревизии: **0.7.0**.
 >
 > Автор: Aleksei Supilin. Лицензия: Apache 2.0.
 
@@ -12,16 +12,16 @@
 
 ## ADR-001 — AppKit shell + SwiftUI content, не чистый SwiftUI
 
-**Контекст.** macOS menu bar приложение, которое записывает голос, транскрибирует и вставляет текст в активное приложение. Нужен non-activating floating panel, сохранение фокуса, LSUIElement.
+**Контекст.** macOS voice-to-text приложение, которое записывает голос, транскрибирует и вставляет текст в активное приложение. Изначально оно было menu-bar-only; после 0.7.0 нужен полноценный Dock/main-window shell, но с тем же точным контролем записи, фокуса, status item и floating indicator.
 
-**Решение.** AppKit (`NSStatusItem`, `NSPanel`, `NSWindow`) для оболочки; SwiftUI внутри `NSHostingView` для Settings, Onboarding, History, индикаторов записи.
+**Решение.** AppKit (`NSApplicationDelegate`, `NSStatusItem`, `NSPanel`, `NSWindow`) для оболочки; SwiftUI внутри `NSHostingView` для Main Window, Settings, Setup, History и индикаторов записи.
 
 **Обоснование.**
 - Recording indicator — non-activating `NSPanel` с `collectionBehavior` (.canJoinAllSpaces, .stationary, .fullScreenAuxiliary). MenuBarExtra это не даёт.
-- Auto-paste требует, чтобы WhisperHot НИКОГДА не был frontmost во время транскрипции. `LSUIElement = true` + `NSStatusItem` — надёжная оболочка.
-- Settings и Onboarding должны восстанавливать фокус на предыдущее приложение при закрытии. SwiftUI scenes агрессивно крадут фокус.
+- Auto-paste требует ручного focus handoff: перед стартом записи из Dashboard главное окно прячется, затем активируется сохранённое target-приложение.
+- Main Window, Settings и Setup должны контролировать `previousApp`, чтобы запись и auto-paste не вставляли текст обратно в WhisperHot.
 
-**Последствия.** Два мира (AppKit + SwiftUI) усложняют lifecycle. Компенсируется тем, что SwiftUI живёт только внутри hosting views.
+**Последствия.** Два мира (AppKit + SwiftUI) усложняют lifecycle. Компенсируется тем, что SwiftUI живёт только внутри hosting views, а AppKit владеет окнами, status item и focus handoff.
 
 **Альтернативы.** SwiftUI `MenuBarExtra` — отвергнут из-за отсутствия контроля над окнами и focus management.
 
@@ -322,8 +322,32 @@
 
 ---
 
+## ADR-016 — Полноценный macOS shell сейчас, Windows как отдельный платформенный порт
+
+**Контекст.** Пользователь явно зафиксировал два направления: перестать быть приложением, которое "живёт в верхнем navbar", и в будущем поддержать Windows. Текущий код глубоко завязан на AppKit, AVAudioEngine, Keychain, TCC/Accessibility, Carbon hotkeys и macOS clipboard/paste APIs.
+
+**Решение.** В 0.7.0 доводим native macOS shell: regular Dock app, главное окно, Dashboard, embedded Settings, History и Setup, при этом menu bar остаётся быстрым контроллером записи. Windows не пытаемся "включить" в SwiftPM; фиксируем отдельную дорожную карту в `docs/windows-support-plan.md` через platform adapters и spike, предпочтительно Tauri v2 + Rust core или Windows-first WinUI 3/C#.
+
+**Обоснование.**
+- Пользовательская боль сейчас на macOS UX: приложение не должно выглядеть как набор menu bar пунктов.
+- Прямой порт Swift/AppKit на Windows невозможен практически: отсутствуют ключевые системные API.
+- Platform adapters позволяют сохранить продуктовый pipeline и не ломать рабочую macOS-версию большим rewrite до проверки Windows MVP.
+
+**Последствия.**
+- macOS остаётся shipped-платформой текущего релиза.
+- Windows support — принятое требование, но не заявленная фича 0.7.0.
+- Новая архитектурная граница для будущих работ: бизнес-логика не должна напрямую зависеть от clipboard, hotkey, audio capture, active app context и secret storage конкретной ОС.
+
+**Альтернативы.**
+- *Оставить menu-bar-only и сразу делать Windows.* Отвергнуто: пользователь явно поставил macOS shell как ближайший приоритет.
+- *Переписать всё в cross-platform shell немедленно.* Отвергнуто: слишком большой риск для уже работающего macOS workflow.
+- *Swift on Windows.* Отвергнуто: проблема не в языке, а в отсутствующих AppKit/AVFoundation/Keychain/TCC API.
+
+---
+
 ## Про будущее (pending / не принято)
 
+- **Windows-порт.** Требование принято, план в `docs/windows-support-plan.md`. Не shipped в 0.7.0.
 - **Streaming транскрипция.** Plan в `docs/streaming-plan.md`. Deepgram/AssemblyAI ~$8/мес. Отложено — batch с Groq (0.5 сек, $0.90/мес) достаточен.
 - **App Sandbox.** Несовместим с `Process` для brew/whisper/llama. Не активирован.
 - **Apple Developer ID + нотаризация.** Убрал бы проблему с Gatekeeper ($99/год). Не приоритет для personal build.

@@ -10,7 +10,42 @@ extension Notification.Name {
     static let whisperHotSettingsWillShow = Notification.Name("WhisperHot.settingsWillShow")
 }
 
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case recording
+    case providers
+    case postProcessing
+    case hotkey
+    case historyPrivacy
+    case updates
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .recording: return L10n.recording
+        case .providers: return L10n.providers
+        case .postProcessing: return L10n.postProcessing
+        case .hotkey: return L10n.hotkey
+        case .historyPrivacy: return L10n.historyPrivacy
+        case .updates: return L10n.sectionUpdates
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .recording: return "mic.fill"
+        case .providers: return "key.fill"
+        case .postProcessing: return "wand.and.stars"
+        case .hotkey: return "keyboard"
+        case .historyPrivacy: return "lock.shield"
+        case .updates: return "arrow.triangle.2.circlepath"
+        }
+    }
+}
+
 struct SettingsView: View {
+    private let embeddedSection: SettingsSection?
+
     @AppStorage(Preferences.Key.provider) private var provider: TranscriptionProvider = .openai
     @AppStorage(Preferences.Key.modelOpenAI) private var modelOpenAI: String = Preferences.Defaults.modelOpenAI
     @AppStorage(Preferences.Key.modelOpenRouter) private var modelOpenRouter: String = Preferences.Defaults.modelOpenRouter
@@ -81,59 +116,44 @@ struct SettingsView: View {
         }
     }
 
-    private enum SettingsSection: String, CaseIterable, Identifiable {
-        case recording
-        case providers
-        case postProcessing
-        case hotkey
-        case historyPrivacy
-        case updates
-
-        var id: String { rawValue }
-
-        var label: String {
-            switch self {
-            case .recording: return L10n.recording
-            case .providers: return L10n.providers
-            case .postProcessing: return L10n.postProcessing
-            case .hotkey: return L10n.hotkey
-            case .historyPrivacy: return L10n.historyPrivacy
-            case .updates: return L10n.sectionUpdates
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .recording: return "mic.fill"
-            case .providers: return "key.fill"
-            case .postProcessing: return "wand.and.stars"
-            case .hotkey: return "keyboard"
-            case .historyPrivacy: return "clock"
-            case .updates: return "arrow.triangle.2.circlepath"
-            }
-        }
-    }
-
     @State private var selectedSection: SettingsSection = .recording
+
+    init(embeddedSection: SettingsSection? = nil) {
+        self.embeddedSection = embeddedSection
+        _selectedSection = State(initialValue: embeddedSection ?? .recording)
+    }
 
     // MARK: - Body
 
     var body: some View {
-        NavigationSplitView {
-            List(SettingsSection.allCases, selection: $selectedSection) { section in
-                Label(section.label, systemImage: section.icon)
-                    .tag(section)
-            }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
-        } detail: {
-            ScrollView {
-                detailContent
-                    .padding()
+        Group {
+            if let embeddedSection {
+                ScrollView {
+                    detailContent(for: embeddedSection)
+                        .padding(24)
+                        .frame(maxWidth: 760, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                NavigationSplitView {
+                    List(SettingsSection.allCases, selection: $selectedSection) { section in
+                        Label(section.label, systemImage: section.icon)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(section.label)
+                            .tag(section)
+                    }
+                    .listStyle(.sidebar)
+                    .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
+                } detail: {
+                    ScrollView {
+                        detailContent(for: selectedSection)
+                            .padding()
+                    }
+                }
+                .frame(minWidth: 700, idealWidth: 740, maxWidth: 900,
+                       minHeight: 480, idealHeight: 600, maxHeight: 900)
             }
         }
-        .frame(minWidth: 700, idealWidth: 740, maxWidth: 900,
-               minHeight: 480, idealHeight: 600, maxHeight: 900)
         .onAppear {
             normalizeStorageValues()
             reloadKeys()
@@ -147,8 +167,8 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private var detailContent: some View {
-        switch selectedSection {
+    private func detailContent(for section: SettingsSection) -> some View {
+        switch section {
         case .recording: recordingTab
         case .providers: providersTab
         case .postProcessing: postProcessingTab

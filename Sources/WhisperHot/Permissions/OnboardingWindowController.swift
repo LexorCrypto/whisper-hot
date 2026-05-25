@@ -24,6 +24,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         let front = NSWorkspace.shared.frontmostApplication
         if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             previousApp = front
+        } else {
+            previousApp = nil
         }
 
         if window == nil {

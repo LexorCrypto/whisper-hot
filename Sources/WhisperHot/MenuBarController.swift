@@ -2,6 +2,60 @@ import AppKit
 
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
+    enum InterfaceMode: Equatable {
+        case idle
+        case recording
+        case transcribing
+    }
+
+    struct InterfaceSnapshot: Equatable {
+        let mode: InterfaceMode
+        let providerName: String
+        let providerModel: String
+        let hotkeyLabel: String
+        let postProcessingEnabled: Bool
+        let postProcessingProviderName: String
+        let postProcessingPresetName: String
+        let contextRoutingEnabled: Bool
+        let historyEnabled: Bool
+        let localWhisperReady: Bool
+        let autoOfflineOnTimeout: Bool
+        let autoPasteEnabled: Bool
+
+        var statusTitle: String {
+            switch mode {
+            case .idle:
+                return L10n.mainStatusReady
+            case .recording:
+                return L10n.mainStatusRecording
+            case .transcribing:
+                return L10n.mainStatusTranscribing
+            }
+        }
+
+        var primaryActionTitle: String {
+            switch mode {
+            case .idle:
+                return L10n.startRecording
+            case .recording:
+                return L10n.stopRecording
+            case .transcribing:
+                return L10n.transcribing
+            }
+        }
+
+        var primaryActionIcon: String {
+            switch mode {
+            case .idle:
+                return "mic.fill"
+            case .recording:
+                return "stop.fill"
+            case .transcribing:
+                return "hourglass"
+            }
+        }
+    }
+
     private enum RecorderState {
         case idle
         case recording
@@ -24,6 +78,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private lazy var indicatorController = IndicatorController(
         rmsProvider: { [audioRecorder] in audioRecorder.currentRMS }
     )
+    var openMainWindowHandler: (() -> Void)?
+
     /// The concrete TranscriptionService is chosen at transcription time
     /// based on `Preferences.provider`, so switching providers in Settings
     /// takes effect on the very next recording without any restart.
@@ -102,7 +158,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case failure(String)
     }
 
-    override init() {
+    init(showsOnboardingAutomatically: Bool = true) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         configureButton(recording: false)
@@ -213,7 +269,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             NSLog("WhisperHot: history prune at launch failed → \(error.localizedDescription)")
         }
 
-        maybeShowOnboarding()
+        if showsOnboardingAutomatically {
+            maybeShowOnboarding()
+        }
     }
 
     deinit {
@@ -481,6 +539,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
+        let mainWindowItem = NSMenuItem(
+            title: L10n.openWhisperHot,
+            action: #selector(openMainWindow(_:)),
+            keyEquivalent: ""
+        )
+        mainWindowItem.target = self
+        menu.addItem(mainWindowItem)
+
+        menu.addItem(.separator())
+
         // --- Primary: Start / Stop recording ---
         let recordItem = NSMenuItem(
             title: L10n.startRecording,
@@ -613,6 +681,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     item.title = L10n.history
                 } else if item.action == #selector(openSettings(_:)) {
                     item.title = L10n.settings
+                } else if item.action == #selector(openMainWindow(_:)) {
+                    item.title = L10n.openWhisperHot
                 } else if item.action == #selector(openOnboarding(_:)) {
                     item.title = L10n.permissions
                 } else if item.action == #selector(showAbout(_:)) {
@@ -960,6 +1030,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         settingsWindowController.show()
     }
 
+    @objc private func openMainWindow(_ sender: Any?) {
+        openMainWindowHandler?()
+    }
+
     /// Provider quick-switch from the status menu. Writes the new
     /// raw value to Preferences; everything downstream (next
     /// transcription, header refresh) picks it up automatically.
@@ -1005,6 +1079,61 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func quit(_ sender: Any?) {
         NSApp.terminate(nil)
+    }
+
+    // MARK: - Main window bridge
+
+    var historyStoreForInterface: HistoryStore { historyStore }
+    var permissionsCoordinatorForInterface: PermissionsCoordinator { permissionsCoordinator }
+
+    func interfaceSnapshot() -> InterfaceSnapshot {
+        let mode: InterfaceMode
+        switch state {
+        case .idle:
+            mode = .idle
+        case .recording:
+            mode = .recording
+        case .transcribing:
+            mode = .transcribing
+        }
+
+        let hotkeyLabel = Preferences.fnKeyEnabled
+            ? "Fn (🌐)"
+            : HotkeyFormatter.format(
+                keyCode: Preferences.hotkeyKeyCode,
+                modifiers: Preferences.hotkeyModifiers
+            )
+
+        return InterfaceSnapshot(
+            mode: mode,
+            providerName: Preferences.provider.shortName,
+            providerModel: Preferences.currentModel,
+            hotkeyLabel: hotkeyLabel,
+            postProcessingEnabled: Preferences.postProcessingEnabled,
+            postProcessingProviderName: Preferences.ppProvider.displayName,
+            postProcessingPresetName: Preferences.postProcessingPreset.displayName,
+            contextRoutingEnabled: Preferences.contextRoutingEnabled,
+            historyEnabled: Preferences.historyEnabled,
+            localWhisperReady: Preferences.isLocalWhisperReady,
+            autoOfflineOnTimeout: Preferences.autoOfflineOnTimeout,
+            autoPasteEnabled: Preferences.autoPaste
+        )
+    }
+
+    func toggleRecordingFromInterface(wantsRawOutput: Bool = false) {
+        toggleRecording(nil, wantsRawOutput: wantsRawOutput)
+    }
+
+    func openSettingsFromInterface() {
+        settingsWindowController.show()
+    }
+
+    func openHistoryFromInterface() {
+        historyWindowController.show()
+    }
+
+    func openOnboardingFromInterface() {
+        onboardingWindowController.show()
     }
 
     // MARK: - Error UI

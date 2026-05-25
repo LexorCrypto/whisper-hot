@@ -3,6 +3,7 @@ import AppKit
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     public override init() { super.init() }
     private var menuBarController: MenuBarController?
+    private var mainWindowController: MainWindowController?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         // Retention housekeeping before any recording work starts.
@@ -18,11 +19,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             AudioRetentionSweeper.sweepStragglers()
         }
 
-        menuBarController = MenuBarController()
+        let menuController = MenuBarController(showsOnboardingAutomatically: false)
+        let mainController = MainWindowController(menuBarController: menuController)
+        menuController.openMainWindowHandler = { [weak mainController] in
+            mainController?.show()
+        }
+        menuBarController = menuController
+        mainWindowController = mainController
+        mainController.show()
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        mainWindowController?.show()
+        return true
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

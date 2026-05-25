@@ -105,12 +105,91 @@ enum L10n {
     static var stopRecording: String { lang == .ru ? "Остановить запись" : "Stop Recording" }
     static var transcribing: String { lang == .ru ? "Транскрибация…" : "Transcribing…" }
     static var settings: String { lang == .ru ? "Настройки…" : "Settings…" }
+    static var openWhisperHot: String { lang == .ru ? "Открыть WhisperHot" : "Open WhisperHot" }
     static var history: String { lang == .ru ? "История" : "History" }
     static var about: String { lang == .ru ? "О WhisperHot" : "About WhisperHot" }
     static var permissions: String { lang == .ru ? "Разрешения и настройка…" : "Permissions & Onboarding…" }
     static var quit: String { lang == .ru ? "Завершить WhisperHot" : "Quit WhisperHot" }
     static var autoOfflineOnTimeout: String { lang == .ru ? "Авто-переключение на Offline при медленной сети" : "Auto-switch to Offline when slow" }
     static var stop: String { lang == .ru ? "Стоп" : "Stop" }
+
+    // MARK: - Main window
+    static var mainGroupOverview: String { lang == .ru ? "Обзор" : "Overview" }
+    static var mainGroupSettings: String { lang == .ru ? "Настройки" : "Settings" }
+    static var mainGroupData: String { lang == .ru ? "Данные и доступ" : "Data & Access" }
+    static var mainDashboard: String { lang == .ru ? "Главная" : "Dashboard" }
+    static var mainPrivacySettings: String { lang == .ru ? "Приватность" : "Privacy" }
+    static var mainSetup: String { lang == .ru ? "Настройка" : "Setup" }
+    static var mainFirstRunReady: String { lang == .ru ? "Можно записывать" : "Ready to record" }
+    static var mainFirstRunNeedsAttention: String { lang == .ru ? "Осталось закончить настройку" : "Finish setup to record" }
+    static var mainStatusReady: String { lang == .ru ? "Готов к записи" : "Ready to record" }
+    static var mainStatusRecording: String { lang == .ru ? "Идёт запись" : "Recording" }
+    static var mainStatusTranscribing: String { lang == .ru ? "Транскрибирую" : "Transcribing" }
+    static var mainCurrentRoute: String { lang == .ru ? "Текущий маршрут" : "Current route" }
+    static var mainWritingPipeline: String { lang == .ru ? "Пайплайн текста" : "Writing pipeline" }
+    static var mainLocalFallback: String { lang == .ru ? "Локальный fallback" : "Local fallback" }
+    static var mainPostProcessingOn: String { lang == .ru ? "LLM-обработка включена" : "LLM cleanup on" }
+    static var mainPostProcessingOff: String { lang == .ru ? "LLM-обработка выключена" : "LLM cleanup off" }
+    static var mainContextRoutingOn: String { lang == .ru ? "Контекстный роутинг включён" : "Context routing on" }
+    static var mainContextRoutingOff: String { lang == .ru ? "Контекстный роутинг выключен" : "Context routing off" }
+    static var mainHistoryOn: String { lang == .ru ? "История включена" : "History on" }
+    static var mainHistoryOff: String { lang == .ru ? "История выключена" : "History off" }
+    static var mainAutoPasteOn: String { lang == .ru ? "Авто-вставка включена" : "Auto-paste on" }
+    static var mainAutoPasteOff: String { lang == .ru ? "Авто-вставка выключена" : "Auto-paste off" }
+    static var mainLocalReady: String { lang == .ru ? "Local whisper.cpp готов" : "Local whisper.cpp ready" }
+    static var mainLocalNotReady: String { lang == .ru ? "Local whisper.cpp не настроен" : "Local whisper.cpp not set up" }
+    static var mainAutoOfflineOn: String { lang == .ru ? "Авто-offline при медленной сети включён" : "Auto-offline on slow network" }
+    static var mainAutoOfflineOff: String { lang == .ru ? "Авто-offline при медленной сети выключен" : "Auto-offline disabled" }
+    static var mainOpenSettings: String { lang == .ru ? "Открыть настройки" : "Open Settings" }
+    static var mainConfigureProviders: String { lang == .ru ? "Настроить провайдеры" : "Configure Providers" }
+    static var mainViewHistory: String { lang == .ru ? "Посмотреть историю" : "View History" }
+    static var mainOpenSetup: String { lang == .ru ? "Открыть настройку доступа" : "Open Setup" }
+    static var mainOpenProviders: String { lang == .ru ? "Открыть провайдеры" : "Open Providers" }
+    static var mainOpenHistoryWindow: String { lang == .ru ? "Открыть историю окном" : "Open History Window" }
+    static var mainOpenPermissionsWindow: String { lang == .ru ? "Открыть разрешения окном" : "Open Permissions Window" }
+    static var mainPermissionsReady: String { lang == .ru ? "Разрешения готовы" : "Permissions ready" }
+    static var mainPermissionsNeedAttention: String { lang == .ru ? "Нужно настроить разрешения" : "Permissions need attention" }
+    static var mainMicPermission: String { lang == .ru ? "Микрофон" : "Microphone" }
+    static var mainAccessibilityPermission: String { lang == .ru ? "Accessibility" : "Accessibility" }
+    static var mainInputMonitoringPermission: String { lang == .ru ? "Input Monitoring" : "Input Monitoring" }
+    static var mainGranted: String { lang == .ru ? "Разрешено" : "Granted" }
+    static var mainNotGranted: String { lang == .ru ? "Не разрешено" : "Not granted" }
+    static var mainDenied: String { lang == .ru ? "Запрещено" : "Denied" }
+    static var mainNotRequested: String { lang == .ru ? "Не запрошено" : "Not requested" }
+    static var mainRequestAccess: String { lang == .ru ? "Запросить доступ" : "Request Access" }
+    static var mainOpenSystemSettings: String { lang == .ru ? "Открыть системные настройки" : "Open System Settings" }
+    static var mainReadyPill: String { lang == .ru ? "Готово" : "Ready" }
+    static var mainProviderNoKeyRequired: String { lang == .ru ? "API-ключ не нужен." : "No API key required." }
+    static var mainLocalProviderMissingDetail: String {
+        lang == .ru
+            ? "Укажите binary и GGML модель в Providers."
+            : "Choose the binary and GGML model in Providers."
+    }
+    static func mainProviderReady(_ provider: String) -> String {
+        lang == .ru ? "\(provider) готов" : "\(provider) ready"
+    }
+    static func mainProviderNeedsSetup(_ provider: String) -> String {
+        lang == .ru ? "Нужно настроить \(provider)" : "Set up \(provider)"
+    }
+    static func mainProviderNeedsAPIKey(_ provider: String) -> String {
+        lang == .ru ? "Нужен API-ключ \(provider)" : "\(provider) API key needed"
+    }
+    static func mainProviderMissingKeyDetail(_ provider: String) -> String {
+        lang == .ru
+            ? "Сохраните ключ \(provider) в Providers."
+            : "Save the \(provider) key in Providers."
+    }
+    static func mainProviderKeySavedDetail(_ provider: String) -> String {
+        lang == .ru
+            ? "Ключ \(provider) сохранён в Keychain."
+            : "\(provider) key is saved in Keychain."
+    }
+    static func mainLocalProviderReady(_ model: String) -> String {
+        lang == .ru ? "Модель: \(model)" : "Model: \(model)"
+    }
+    static func mainProviderCheckFailed(_ provider: String) -> String {
+        lang == .ru ? "Не удалось проверить \(provider)" : "Could not check \(provider)"
+    }
 
     // MARK: - Recording / transcription banners (status menu)
     static func recordingErrorBanner(_ message: String) -> String {

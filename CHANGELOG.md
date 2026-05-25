@@ -2,6 +2,79 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.7.0] — 2026-05-25
+
+Product/UX релиз. WhisperHot больше не ощущается как набор пунктов в
+menu bar: появился полноценный macOS shell с главным окном, Dock-иконкой,
+Dashboard, встроенными настройками, историей и Setup.
+
+### Для пользователей
+
+- **Полноценное главное окно.** Приложение теперь запускается как обычное
+  macOS-приложение с Dock-иконкой и окном `WhisperHot`. В sidebar доступны
+  Dashboard, Recording, Providers, Post-processing, Hotkey, Privacy,
+  Updates, History и Setup.
+- **Menu bar остался быстрым контроллером.** Status item не удалён:
+  оттуда по-прежнему можно стартовать/остановить запись, сменить provider,
+  открыть историю/настройки/permissions и вернуть главное окно через
+  `Open WhisperHot`.
+- **Dashboard стал рабочей точкой входа.** Он показывает текущий STT route,
+  модель, hotkey, post-processing/context/history/autopaste/local fallback
+  и даёт primary-кнопку записи.
+- **Запись из Dashboard не вставляет текст обратно в WhisperHot.** Перед
+  стартом записи главное окно прячется, WhisperHot возвращает фокус в
+  предыдущее приложение и только затем начинает запись. Это сохраняет
+  привычный auto-paste flow.
+- **Настройки встроены в главный shell.** Recording / Providers /
+  Post-processing / Hotkey / Privacy / Updates теперь открываются как
+  разделы общего окна, без вложенного sidebar. Старое отдельное окно
+  Settings оставлено как fallback из menu bar.
+- **History встроена в главное окно.** Отдельное History окно сохранено,
+  но основной путь теперь внутри главного shell.
+- **Setup стал readiness-чеклистом.** Он показывает Microphone,
+  Accessibility, Input Monitoring и готовность текущего STT-провайдера:
+  cloud API key в Keychain или local whisper.cpp binary+model. Когда всё
+  готово, строки показывают компактный зелёный бейдж `Готово`.
+- **Windows support зафиксирован как продуктовая цель.** Реализация
+  остаётся macOS-only, но roadmap вынесен в
+  `docs/windows-support-plan.md`, чтобы не смешивать текущую macOS-доводку
+  с будущим Windows-портом.
+
+### Для разработчиков
+
+- `LSUIElement` удалён из `Resources/Info.plist`; entrypoint ставит
+  `NSApplication.ActivationPolicy.regular`.
+- `AppDelegate` теперь создаёт `MenuBarController` +
+  `MainWindowController`, показывает главное окно на launch и
+  восстанавливает его на Dock/reopen.
+- `MenuBarController` получил interface bridge:
+  `InterfaceSnapshot`, `toggleRecordingFromInterface`, open handlers для
+  Main Window / Settings / History / Onboarding и доступ к HistoryStore /
+  PermissionsCoordinator для SwiftUI shell.
+- Добавлен `Sources/WhisperHot/MainWindow/MainWindowController.swift`:
+  `NavigationSplitView` shell, Dashboard, Setup, embedded Settings sections
+  и polling model для state/permissions snapshots.
+- `SettingsView` получил `embeddedSection` mode. В отдельном Settings
+  окне он по-прежнему показывает собственный sidebar, а в главном окне
+  рендерит только выбранную секцию.
+- `HistoryView` вынесен в переиспользуемый `TranscriptHistoryView`, чтобы
+  встроенная History и отдельное окно использовали один UI.
+- Settings / History / Onboarding / Main Window очищают stale
+  `previousApp`, если открыты из самого WhisperHot.
+- Документация обновлена: README, ARCHITECTURE, decisions, status и
+  Windows roadmap.
+
+### Проверка
+
+- `swift build -c release` — OK.
+- `swift test` — 54/54 passed.
+- `./build.sh` — OK.
+- Window-only visual QA главного окна и Setup — OK.
+- Click-through QA без записи микрофона — OK.
+- Sensitive recording QA с согласием пользователя — OK:
+  Dashboard start → тестовый audio input → status-menu stop → Groq
+  transcript → auto-paste в новый TextEdit-документ.
+
 ## [0.6.9] — 2026-05-09
 
 Stability релиз. Закрывает класс багов «приложение виснет после возврата

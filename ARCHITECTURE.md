@@ -1,13 +1,19 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 45 Swift файлов, ~8130 строк (после v0.6.9: добавлены
+приложение. 48 Swift файлов, ~8840 строк (после v0.7.0: добавлены
 sleep/wake recovery, per-session audio primitives, ephemeral
-URLSession). Три SwiftPM target:
+URLSession и полноценное главное окно). Три SwiftPM target:
 `WhisperHotLib` (library), `WhisperHot` (thin executable),
 `WhisperHotTests` (unit tests с @testable import). AppKit — основная оболочка,
-SwiftUI живёт внутри Settings, Onboarding, History и recording
-indicator через `NSHostingView`.
+SwiftUI живёт внутри Main Window, Settings, Onboarding, History и
+recording indicator через `NSHostingView`.
+
+Платформенный статус: текущая реализация macOS-only. Windows-порт
+зафиксирован как отдельное направление в
+[`docs/windows-support-plan.md`](docs/windows-support-plan.md); он требует
+платформенных адаптеров вместо прямой сборки текущего AppKit/AVFoundation
+кода под Windows.
 
 ## Почему AppKit, а не MenuBarExtra
 
@@ -18,14 +24,15 @@ settings scene. Ревизия перешла на AppKit `NSStatusItem`, пот
    специфичными флагами `collectionBehavior` (`canJoinAllSpaces`,
    `stationary`, `fullScreenAuxiliary`). MenuBarExtra не даёт
    такого уровня контроля над окнами.
-2. Settings и Onboarding окна должны сохранять фокус на приложении,
-   в которое ты диктовал. Для этого нужен ручной захват
+2. Main Window, Settings и Onboarding должны уметь возвращать фокус на
+   приложение, в которое ты диктовал. Для этого нужен ручной захват
    `previousApp = NSWorkspace.shared.frontmostApplication` и явный
-   `.activate(options: [])` на close. SwiftUI scenes крадут фокус
-   агрессивно и неудобны для такой задачи.
-3. Block 5 auto-paste зависит от того, что WhisperHot НИКОГДА не
-   становится frontmost во время транскрибации. `LSUIElement = true`
-   плюс обычный `NSStatusItem` — самая надёжная оболочка для этого.
+   `.activate(options: [])` перед записью или на close. SwiftUI scenes
+   крадут фокус агрессивно и неудобны для такой задачи.
+3. Auto-paste зависит от того, что перед стартом записи WhisperHot
+   отдаёт фокус целевому приложению. После main-window MVP приложение
+   больше не `LSUIElement` и появляется в Dock, но AppKit shell всё ещё
+   нужен, чтобы вручную управлять focus handoff.
 
 SwiftUI всё равно используется для всего реального UI внутри этих
 окон. Внешний контейнер — AppKit, содержимое — SwiftUI.
@@ -77,9 +84,11 @@ Sources/WhisperHot/
 │
 ├── Settings/
 │   ├── Preferences.swift         UserDefaults ключи + типизированные accessors
-│   └── SettingsView.swift        SwiftUI NavigationSplitView (sidebar, 5 секций) внутри NSHostingView
+│   └── SettingsView.swift        SwiftUI settings sections; standalone sidebar + embedded main-window mode
 │
 ├── SettingsWindowController.swift  NSWindow host для SettingsView
+├── MainWindow/
+│   └── MainWindowController.swift  Dock window shell: Dashboard, settings sections, History, Setup
 │
 ├── Indicator/
 │   ├── IndicatorController.swift   NSPanel owner; читает Preferences
