@@ -160,6 +160,11 @@ enum L10n {
     static var mainOpenSystemSettings: String { lang == .ru ? "Открыть системные настройки" : "Open System Settings" }
     static var mainReadyPill: String { lang == .ru ? "Готово" : "Ready" }
     static var mainProviderNoKeyRequired: String { lang == .ru ? "API-ключ не нужен." : "No API key required." }
+    static var mainProviderKeyCheckDeferred: String {
+        lang == .ru
+            ? "Ключ не читается при запуске, чтобы не вызывать Keychain prompt."
+            : "Key is not read at launch to avoid Keychain prompts."
+    }
     static var mainLocalProviderMissingDetail: String {
         lang == .ru
             ? "Укажите binary и GGML модель в Providers."
@@ -167,6 +172,9 @@ enum L10n {
     }
     static func mainProviderReady(_ provider: String) -> String {
         lang == .ru ? "\(provider) готов" : "\(provider) ready"
+    }
+    static func mainProviderNotChecked(_ provider: String) -> String {
+        lang == .ru ? "\(provider) не проверяется при запуске" : "\(provider) not checked at launch"
     }
     static func mainProviderNeedsSetup(_ provider: String) -> String {
         lang == .ru ? "Нужно настроить \(provider)" : "Set up \(provider)"

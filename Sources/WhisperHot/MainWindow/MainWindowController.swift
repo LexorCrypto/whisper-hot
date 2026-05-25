@@ -115,7 +115,7 @@ final class MainWindowModel: ObservableObject {
         self.microphoneState = permissions.microphoneState()
         self.accessibilityGranted = permissions.accessibilityGranted()
         self.inputMonitoringState = permissions.inputMonitoringState()
-        self.providerSetupStatus = Self.readProviderSetupStatus()
+        self.providerSetupStatus = Self.readProviderSetupStatus(checksKeychain: false)
     }
 
     var allRequiredPermissionsReady: Bool {
@@ -150,7 +150,7 @@ final class MainWindowModel: ObservableObject {
         }
 
         if includeProviderSetup {
-            let nextProviderSetup = Self.readProviderSetupStatus()
+            let nextProviderSetup = Self.readProviderSetupStatus(checksKeychain: false)
             if nextProviderSetup != providerSetupStatus {
                 providerSetupStatus = nextProviderSetup
             }
@@ -203,7 +203,7 @@ final class MainWindowModel: ObservableObject {
         let isReady: Bool
     }
 
-    private static func readProviderSetupStatus() -> ProviderSetupStatus {
+    private static func readProviderSetupStatus(checksKeychain: Bool) -> ProviderSetupStatus {
         let provider = Preferences.provider
 
         if provider == .localWhisper {
@@ -229,6 +229,15 @@ final class MainWindowModel: ObservableObject {
                 title: L10n.mainProviderReady(provider.shortName),
                 detail: L10n.mainProviderNoKeyRequired,
                 systemImage: "checkmark.seal.fill",
+                isReady: true
+            )
+        }
+
+        guard checksKeychain else {
+            return ProviderSetupStatus(
+                title: L10n.mainProviderNotChecked(provider.shortName),
+                detail: L10n.mainProviderKeyCheckDeferred,
+                systemImage: "key.fill",
                 isReady: true
             )
         }
@@ -303,15 +312,15 @@ private struct MainWindowView: View {
             detailView
         }
         .frame(minWidth: 860, idealWidth: 960, minHeight: 600, idealHeight: 680)
-        .onAppear { model.refresh(includeProviderSetup: true) }
+        .onAppear { model.refresh(includeProviderSetup: false) }
         .onReceive(Timer.publish(every: 0.75, on: .main, in: .common).autoconnect()) { _ in
             model.refresh(includeProviderSetup: false)
         }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
-            model.refresh(includeProviderSetup: true)
+            model.refresh(includeProviderSetup: false)
         }
         .onReceive(NotificationCenter.default.publisher(for: .whisperHotKeychainDidChange)) { _ in
-            model.refresh(includeProviderSetup: true)
+            model.refresh(includeProviderSetup: false)
         }
     }
 

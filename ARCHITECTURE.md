@@ -1,9 +1,10 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 48 Swift файлов, ~8940 строк (после v0.7.1: добавлены
+приложение. 48 Swift файлов, ~8940 строк (после v0.7.2: добавлены
 sleep/wake recovery, per-session audio primitives, ephemeral
-URLSession, полноценное главное окно и Keychain ACL repair). Три SwiftPM target:
+URLSession, полноценное главное окно и защита от Keychain prompt-loop).
+Три SwiftPM target:
 `WhisperHotLib` (library), `WhisperHot` (thin executable),
 `WhisperHotTests` (unit tests с @testable import). AppKit — основная оболочка,
 SwiftUI живёт внутри Main Window, Settings, Onboarding, History и
@@ -329,14 +330,13 @@ codesigning` по CN. Если identity отсутствует или найде
 Ad-hoc fallback не предусмотрен специально: тихий откат на ad-hoc
 был бы именно тем регрессом, от которого мы ушли.
 
-В 0.7.1 добавлен второй слой защиты для пользователей, у которых
-Keychain items были созданы старыми ad-hoc сборками или до стабилизации
-ACL. Новые production items (`com.aleksejsupilin.WhisperHot`) создаются
-с явным `kSecAttrAccess` для текущего приложения, а существующие items
-получают best-effort ACL repair после успешного чтения. Главное окно
-больше не читает API key по 0.75s UI timer: provider readiness
-пересчитывается только при открытии окна, изменении настроек или
-save/delete ключа.
+В 0.7.1 была попытка repair'ить старые Keychain item ACL через
+`kSecAttrAccess`; на живых user items это могло вызвать повторяющийся
+macOS prompt-loop. 0.7.2 откатывает этот путь полностью. Главное окно
+не читает API key при запуске и по 0.75s UI timer: provider readiness
+для cloud-провайдеров показывается без touching Keychain. Реальное
+чтение ключа остаётся только на явных путях, где secret действительно
+нужен: Providers/Settings и transcription pipeline.
 
 Два макОС-specific gotchas зашиты в комментарии
 `scripts/create-signing-identity.sh` шаг [2/7]:

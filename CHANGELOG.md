@@ -2,10 +2,45 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.7.2] — 2026-05-25
+
+Emergency hotfix. `0.7.1` пытался ремонтировать Keychain ACL через
+`kSecAttrAccess`, но на живых user items это могло зациклить macOS prompt:
+после ввода login keychain password окно появлялось снова и снова.
+
+### Для пользователей
+
+- **Откатан risky Keychain ACL repair из 0.7.1.** WhisperHot больше не
+  вызывает `SecAccessCreate` / `SecItemUpdate(kSecAttrAccess)` для
+  существующих API keys.
+- **Главное окно больше не читает API key при запуске.** Setup показывает,
+  что cloud provider не проверяется на старте, чтобы приложение могло
+  открыться без Keychain prompt-loop.
+- **Keychain читается только при явном действии.** Например, когда пользователь
+  открывает Providers/Settings или запускает транскрипцию, где API key
+  реально нужен.
+
+### Для разработчиков
+
+- Убран `Darwin` import, dynamic lookup `SecAccessCreate`, `kSecAttrAccess`
+  на add/update и best-effort ACL repair path.
+- `MainWindowModel.readProviderSetupStatus` теперь работает в no-Keychain
+  mode для cloud-провайдеров на launch/UI refresh.
+- Добавлены L10n строки для deferred provider key check.
+
+### Проверка
+
+- `swift build -c release` — OK.
+- `swift test` — OK.
+- `git diff --check` — OK.
+
 ## [0.7.1] — 2026-05-25
 
 Patch-релиз после main-window MVP. Исправляет повторяющиеся запросы
 macOS Keychain access после установки свежей сборки поверх предыдущей.
+
+> Superseded by `0.7.2`: ACL repair path мог вызвать повторяющийся
+> Keychain prompt-loop на живых user items.
 
 ### Для пользователей
 

@@ -4,7 +4,7 @@
 >
 > Формат записи: **Контекст → Решение → Обоснование → Последствия → Альтернативы**.
 >
-> Версия приложения на момент ревизии: **0.7.1**.
+> Версия приложения на момент ревизии: **0.7.2**.
 >
 > Автор: Aleksei Supilin. Лицензия: Apache 2.0.
 
@@ -394,11 +394,59 @@ H"3e456ffaf9ca555c650522806ffb010acc8c528f"`. Значит проблема не
 - *Оставить только стабильную подпись.* Недостаточно для items со старым ACL.
 - *Перейти на другой secret storage.* Слишком большой scope для patch-релиза.
 
+**Superseded by ADR-018.** На живых user items `kSecAttrAccess` repair мог
+спровоцировать повторяющийся Keychain prompt-loop. Решение откатили в 0.7.2.
+
+---
+
+## ADR-018 — Hotfix: не читать Keychain на launch и откатить ACL repair
+
+**Контекст.** После установки `0.7.1` пользователь сообщил, что приложение
+постоянно спрашивает пароль от login keychain: после ввода prompt появляется
+снова, уже 10+ раз. Процесс `WhisperHot` был остановлен, prompt-loop прекратился.
+Это подтвердило, что 0.7.1 ACL-repair path сам стал триггером повторных
+Keychain prompts.
+
+**Решение.** В `0.7.2` полностью убрать risky ACL repair:
+
+1. Удалить dynamic lookup `SecAccessCreate`.
+2. Не задавать `kSecAttrAccess` при `SecItemAdd` / `SecItemUpdate`.
+3. Не выполнять `SecItemUpdate(kSecAttrAccess)` после чтения.
+4. Главное окно не читает API key при init, `onAppear`,
+   `UserDefaults.didChangeNotification`, `WhisperHot.keychainDidChange` или
+   0.75s timer. Cloud provider readiness показывается как deferred check.
+5. Keychain остаётся на явных путях: Providers/Settings и transcription
+   pipeline, где secret реально нужен.
+
+**Обоснование.**
+- Для emergency hotfix главный критерий — приложение должно открываться без
+  prompt-loop.
+- Старые ACL можно чинить только отдельным, явно запущенным maintenance flow,
+  а не автоматической миграцией на launch/read.
+- Deferred readiness лучше временно менее точного Setup, чем блокирующий
+  системный prompt-loop.
+
+**Последствия.**
+- `0.7.2` supersedes `0.7.1`; `0.7.1` нельзя считать стабильной версией.
+- Setup больше не гарантирует, что cloud API key существует, пока пользователь
+  явно не откроет Providers или не начнёт transcription.
+- Если старый Keychain item всё ещё имеет проблемный ACL, prompt может
+  появиться при реальной транскрипции или открытии Providers. Это лучше, чем
+  prompt-loop на старте, но требует отдельного ручного repair/reset сценария.
+
+**Альтернативы.**
+- *Продолжать ACL repair, но добавить once-per-run guard.* Отвергнуто:
+  системный prompt уже показал, что сам repair unsafe.
+- *Удалить старые items автоматически.* Отвергнуто: потеря API keys без явного
+  согласия.
+- *Оставить 0.7.1 latest и дать инструкцию пользователю удалить Keychain
+  items.* Отвергнуто: latest должен быть безопасным по запуску.
+
 ---
 
 ## Про будущее (pending / не принято)
 
-- **Windows-порт.** Требование принято, план в `docs/windows-support-plan.md`. Не shipped в 0.7.1.
+- **Windows-порт.** Требование принято, план в `docs/windows-support-plan.md`. Не shipped в 0.7.2.
 - **Streaming транскрипция.** Plan в `docs/streaming-plan.md`. Deepgram/AssemblyAI ~$8/мес. Отложено — batch с Groq (0.5 сек, $0.90/мес) достаточен.
 - **App Sandbox.** Несовместим с `Process` для brew/whisper/llama. Не активирован.
 - **Apple Developer ID + нотаризация.** Убрал бы проблему с Gatekeeper ($99/год). Не приоритет для personal build.
