@@ -1,9 +1,9 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 48 Swift файлов, ~8840 строк (после v0.7.0: добавлены
+приложение. 48 Swift файлов, ~8940 строк (после v0.7.1: добавлены
 sleep/wake recovery, per-session audio primitives, ephemeral
-URLSession и полноценное главное окно). Три SwiftPM target:
+URLSession, полноценное главное окно и Keychain ACL repair). Три SwiftPM target:
 `WhisperHotLib` (library), `WhisperHot` (thin executable),
 `WhisperHotTests` (unit tests с @testable import). AppKit — основная оболочка,
 SwiftUI живёт внутри Main Window, Settings, Onboarding, History и
@@ -328,6 +328,15 @@ codesigning` по CN. Если identity отсутствует или найде
 дубликаты — скрипт падает с инструкцией запустить one-shot setup.
 Ad-hoc fallback не предусмотрен специально: тихий откат на ad-hoc
 был бы именно тем регрессом, от которого мы ушли.
+
+В 0.7.1 добавлен второй слой защиты для пользователей, у которых
+Keychain items были созданы старыми ad-hoc сборками или до стабилизации
+ACL. Новые production items (`com.aleksejsupilin.WhisperHot`) создаются
+с явным `kSecAttrAccess` для текущего приложения, а существующие items
+получают best-effort ACL repair после успешного чтения. Главное окно
+больше не читает API key по 0.75s UI timer: provider readiness
+пересчитывается только при открытии окна, изменении настроек или
+save/delete ключа.
 
 Два макОС-specific gotchas зашиты в комментарии
 `scripts/create-signing-identity.sh` шаг [2/7]:

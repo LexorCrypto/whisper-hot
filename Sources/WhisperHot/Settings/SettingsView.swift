@@ -8,6 +8,9 @@ extension Notification.Name {
     /// since the view was first constructed (the hosting view is built once
     /// and reused across open/close cycles).
     static let whisperHotSettingsWillShow = Notification.Name("WhisperHot.settingsWillShow")
+    /// Posted after WhisperHot saves or deletes one of its Keychain entries
+    /// so readiness UI can refresh without polling secrets.
+    static let whisperHotKeychainDidChange = Notification.Name("WhisperHot.keychainDidChange")
 }
 
 enum SettingsSection: String, CaseIterable, Identifiable {

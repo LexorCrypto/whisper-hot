@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Security
 
 /// Minimal wrapper around Keychain Services for generic-password items.
@@ -36,6 +37,20 @@ enum Keychain {
     /// entries isolated from the user's real keychain.
     static let defaultService = "com.aleksejsupilin.WhisperHot"
 
+    private typealias SecAccessCreateFunction = @convention(c) (
+        CFString,
+        CFArray?,
+        UnsafeMutablePointer<SecAccess?>
+    ) -> OSStatus
+
+    private static let secAccessCreate: SecAccessCreateFunction? = {
+        guard let handle = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_NOW),
+              let symbol = dlsym(handle, "SecAccessCreate") else {
+            return nil
+        }
+        return unsafeBitCast(symbol, to: SecAccessCreateFunction.self)
+    }()
+
     static func save(apiKey: String, account: Account, service: String = defaultService) throws {
         guard let data = apiKey.data(using: .utf8) else {
             throw KeychainError.invalidData
@@ -60,6 +75,9 @@ enum Keychain {
         let status = SecItemDelete(query as CFDictionary)
         if status != errSecSuccess && status != errSecItemNotFound {
             throw KeychainError.unexpectedStatus(status)
+        }
+        if status == errSecSuccess {
+            postChangeNotification()
         }
     }
 
@@ -87,12 +105,11 @@ enum Keychain {
             kSecAttrAccount as String: account.rawValue
         ]
 
-        let updateAttributes: [String: Any] = [
-            kSecValueData as String: data
-        ]
+        let updateAttributes = try attributesForUpdate(data: data, account: account, service: service)
 
         let updateStatus = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
         if updateStatus == errSecSuccess {
+            postChangeNotification()
             return
         }
 
@@ -101,7 +118,7 @@ enum Keychain {
         }
 
         // No existing item → add a fresh one with the full attribute set.
-        let addQuery: [String: Any] = [
+        var addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account.rawValue,
@@ -109,11 +126,15 @@ enum Keychain {
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
             kSecAttrSynchronizable as String: kCFBooleanFalse as Any
         ]
+        if shouldRepairAccess(for: service) {
+            addQuery[kSecAttrAccess as String] = try access(account: account, service: service)
+        }
 
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
         guard addStatus == errSecSuccess else {
             throw KeychainError.unexpectedStatus(addStatus)
         }
+        postChangeNotification()
     }
 
     /// Read raw Data for a generic-password record. Shared by `readAPIKey(account:)`
@@ -139,6 +160,63 @@ enum Keychain {
         guard let data = result as? Data else {
             throw KeychainError.invalidData
         }
+        repairAccessIfPossible(account: account, service: service)
         return data
+    }
+
+    private static func attributesForUpdate(data: Data, account: Account, service: String) throws -> [String: Any] {
+        var attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        if shouldRepairAccess(for: service) {
+            attributes[kSecAttrAccess as String] = try access(account: account, service: service)
+        }
+        return attributes
+    }
+
+    /// macOS generic-password items carry an ACL. Making it explicit avoids
+    /// inheriting stale ad-hoc build ACLs and lets updated builds repair older
+    /// entries after the user authorizes access once.
+    private static func access(account: Account, service: String) throws -> SecAccess {
+        var access: SecAccess?
+        let description = "\(service).\(account.rawValue)" as CFString
+        guard let secAccessCreate else {
+            throw KeychainError.unexpectedStatus(errSecUnimplemented)
+        }
+        let status = secAccessCreate(description, nil, &access)
+        guard status == errSecSuccess, let access else {
+            throw KeychainError.unexpectedStatus(status)
+        }
+        return access
+    }
+
+    private static func repairAccessIfPossible(account: Account, service: String) {
+        guard shouldRepairAccess(for: service) else { return }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account.rawValue
+        ]
+
+        do {
+            let status = SecItemUpdate(
+                query as CFDictionary,
+                [kSecAttrAccess as String: try access(account: account, service: service)] as CFDictionary
+            )
+            _ = status
+        } catch {
+            // Best-effort migration only. The read already succeeded, so never
+            // turn an ACL repair hiccup into a user-visible Keychain failure.
+        }
+    }
+
+    private static func shouldRepairAccess(for service: String) -> Bool {
+        service == defaultService
+    }
+
+    private static func postChangeNotification() {
+        NotificationCenter.default.post(name: .whisperHotKeychainDidChange, object: nil)
     }
 }

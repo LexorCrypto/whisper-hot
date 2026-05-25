@@ -2,6 +2,45 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.7.1] — 2026-05-25
+
+Patch-релиз после main-window MVP. Исправляет повторяющиеся запросы
+macOS Keychain access после установки свежей сборки поверх предыдущей.
+
+### Для пользователей
+
+- **Keychain больше не должен просить пароль после каждой сборки.**
+  WhisperHot теперь ремонтирует ACL существующих production Keychain
+  items после успешного доступа и создаёт новые items с явным access
+  control для текущей signed identity.
+- **Setup перестал дёргать Keychain каждые 0.75 секунды.** Главное окно
+  по-прежнему обновляет состояние записи и permissions по таймеру, но
+  readiness текущего STT-провайдера перечитывает API key только при
+  открытии окна, изменении настроек или save/delete ключа.
+
+Ожидаемое поведение: при первом запуске `0.7.1` macOS может один раз
+попросить доступ к старым ключам. После `Разрешить всегда` приложение
+repair-ит ACL, и следующие сборки с тем же `whisper-hot-local`
+сертификатом не должны спрашивать заново.
+
+### Для разработчиков
+
+- `Keychain.saveRaw` добавляет `kSecAttrAccess` для production service
+  `com.aleksejsupilin.WhisperHot`; тестовые service-id остаются без
+  ACL-override, чтобы XCTest не провоцировал системные prompts.
+- `Keychain.readRaw` делает best-effort ACL repair для старых production
+  items после успешного `SecItemCopyMatching`.
+- Добавлена notification `WhisperHot.keychainDidChange`, чтобы Main Window
+  мог обновлять readiness без polling secrets.
+- `MainWindowModel.refresh` получил флаг `includeProviderSetup`; timer
+  refresh больше не читает Keychain.
+
+### Проверка
+
+- `swift build -c release` — OK, без warnings.
+- `swift test` — 54/54 passed.
+- `git diff --check` — OK.
+
 ## [0.7.0] — 2026-05-25
 
 Product/UX релиз. WhisperHot больше не ощущается как набор пунктов в

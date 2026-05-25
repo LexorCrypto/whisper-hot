@@ -126,7 +126,7 @@ final class MainWindowModel: ObservableObject {
         allRequiredPermissionsReady && providerSetupStatus.isReady
     }
 
-    func refresh() {
+    func refresh(includeProviderSetup: Bool = false) {
         if let menuBarController {
             let next = menuBarController.interfaceSnapshot()
             if next != snapshot {
@@ -149,9 +149,11 @@ final class MainWindowModel: ObservableObject {
             inputMonitoringState = nextInputMonitoring
         }
 
-        let nextProviderSetup = Self.readProviderSetupStatus()
-        if nextProviderSetup != providerSetupStatus {
-            providerSetupStatus = nextProviderSetup
+        if includeProviderSetup {
+            let nextProviderSetup = Self.readProviderSetupStatus()
+            if nextProviderSetup != providerSetupStatus {
+                providerSetupStatus = nextProviderSetup
+            }
         }
     }
 
@@ -174,7 +176,7 @@ final class MainWindowModel: ObservableObject {
     func requestMicrophoneAccess() {
         Task { @MainActor in
             _ = await permissions.requestMicrophone()
-            refresh()
+            refresh(includeProviderSetup: true)
         }
     }
 
@@ -185,13 +187,13 @@ final class MainWindowModel: ObservableObject {
     func openAccessibilitySettings() {
         permissions.promptAccessibility()
         permissions.openAccessibilitySettings()
-        refresh()
+        refresh(includeProviderSetup: false)
     }
 
     func openInputMonitoringSettings() {
         _ = permissions.requestInputMonitoring()
         permissions.openInputMonitoringSettings()
-        refresh()
+        refresh(includeProviderSetup: false)
     }
 
     struct ProviderSetupStatus: Equatable {
@@ -301,12 +303,15 @@ private struct MainWindowView: View {
             detailView
         }
         .frame(minWidth: 860, idealWidth: 960, minHeight: 600, idealHeight: 680)
-        .onAppear { model.refresh() }
+        .onAppear { model.refresh(includeProviderSetup: true) }
         .onReceive(Timer.publish(every: 0.75, on: .main, in: .common).autoconnect()) { _ in
-            model.refresh()
+            model.refresh(includeProviderSetup: false)
         }
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
-            model.refresh()
+            model.refresh(includeProviderSetup: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .whisperHotKeychainDidChange)) { _ in
+            model.refresh(includeProviderSetup: true)
         }
     }
 

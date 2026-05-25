@@ -4,7 +4,7 @@
 >
 > Формат записи: **Контекст → Решение → Обоснование → Последствия → Альтернативы**.
 >
-> Версия приложения на момент ревизии: **0.7.0**.
+> Версия приложения на момент ревизии: **0.7.1**.
 >
 > Автор: Aleksei Supilin. Лицензия: Apache 2.0.
 
@@ -345,9 +345,60 @@
 
 ---
 
+## ADR-017 — Keychain ACL repair + no secret polling in main window
+
+**Контекст.** После установки `0.7.0` пользователь подтвердил, что GitHub
+DMG запускается, но macOS снова просит пароль к login keychain и по два раза
+требует `Разрешить всегда` после каждой новой сборки. Подпись bundle
+проверена: designated requirement у `/Applications/WhisperHot.app` и
+локального build output совпадает и завязан на
+`identifier "com.aleksejsupilin.WhisperHot" and certificate leaf =
+H"3e456ffaf9ca555c650522806ffb010acc8c528f"`. Значит проблема не в
+текущей подписи, а в старых Keychain item ACL и частоте чтения secrets.
+
+**Решение.** В `0.7.1`:
+
+1. Production Keychain items (`service == com.aleksejsupilin.WhisperHot`)
+   создаются и обновляются с явным `kSecAttrAccess`, сгенерированным для
+   текущего приложения.
+2. После успешного чтения старого production item WhisperHot делает
+   best-effort ACL repair через `SecItemUpdate(kSecAttrAccess)`.
+3. Тестовые service-id не получают ACL override, чтобы XCTest не зависал на
+   системных Keychain prompts.
+4. `MainWindowModel.refresh` больше не читает API key на 0.75s UI timer.
+   Provider readiness перечитывает Keychain только на `onAppear`, при
+   `UserDefaults.didChangeNotification` и после save/delete ключа.
+
+**Обоснование.**
+- Старые items могли быть созданы ad-hoc сборками или до стабилизации ACL;
+  просто стабильной подписи недостаточно, если item уже доверяет старому
+  requirement.
+- Новое главное окно сделало проблему заметнее, потому что Setup readiness
+  polling регулярно вызывал `SecItemCopyMatching`.
+- Repair после успешного чтения сохраняет пользовательские ключи и требует
+  максимум один финальный `Разрешить всегда` для старого item.
+
+**Последствия.**
+- На первом запуске `0.7.1` macOS может ещё раз спросить доступ к старым
+  keys; после этого ACL должен обновиться и следующие сборки с тем же
+  `whisper-hot-local` certificate не должны повторять prompt.
+- Если repair не сработает, чтение всё равно возвращает данные: ACL migration
+  best-effort и не ломает транскрипцию.
+- Используется deprecated Keychain ACL API (`SecAccessCreate`) через dynamic
+  lookup, потому что modern Keychain APIs не дают эквивалентной миграции ACL
+  для существующих generic-password items без смены всей storage-модели.
+
+**Альтернативы.**
+- *Удалить и пересоздать все Keychain items.* Отвергнуто: пользователь
+  потеряет API keys.
+- *Оставить только стабильную подпись.* Недостаточно для items со старым ACL.
+- *Перейти на другой secret storage.* Слишком большой scope для patch-релиза.
+
+---
+
 ## Про будущее (pending / не принято)
 
-- **Windows-порт.** Требование принято, план в `docs/windows-support-plan.md`. Не shipped в 0.7.0.
+- **Windows-порт.** Требование принято, план в `docs/windows-support-plan.md`. Не shipped в 0.7.1.
 - **Streaming транскрипция.** Plan в `docs/streaming-plan.md`. Deepgram/AssemblyAI ~$8/мес. Отложено — batch с Groq (0.5 сек, $0.90/мес) достаточен.
 - **App Sandbox.** Несовместим с `Process` для brew/whisper/llama. Не активирован.
 - **Apple Developer ID + нотаризация.** Убрал бы проблему с Gatekeeper ($99/год). Не приоритет для personal build.
