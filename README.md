@@ -244,13 +244,34 @@ File Provider переприклеивает `com.apple.FinderInfo` и
 Пишет `WhisperHot-<version>.dmg` рядом с .app (сейчас
 `WhisperHot-0.7.2.dmg`).
 
+### Developer ID / нотаризация
+
+Дефолтная сборка остаётся локальной (`SIGNING_MODE=local`), чтобы
+быстрые dev-сборки не зависели от Apple аккаунта. Для публичного DMG
+после установки Apple Developer ID Application сертификата:
+
+```bash
+export DEVELOPER_ID_APPLICATION_IDENTITY='Developer ID Application: Your Name (TEAMID)'
+./scripts/setup-notary-profile.sh
+SIGNING_MODE=developer-id ./build-dmg.sh
+```
+
+`setup-notary-profile.sh` сохраняет credentials для `xcrun notarytool`
+в Keychain под профилем `WhisperHotNotary`. Пароль нужен
+app-specific, не обычный Apple ID password. `build.sh` в
+`SIGNING_MODE=developer-id` подписывает `.app` с Hardened Runtime и
+`Resources/WhisperHot.entitlements`; `build-dmg.sh` подписывает DMG,
+отправляет его на notarization, staple-ит ticket и прогоняет
+Gatekeeper assessment.
+
 ## Известные ограничения
 
-- Подпись — локальный self-signed cert, не Developer ID, не
-  нотаризован. Первый запуск свежеустановленной копии всё равно
-  упрётся в Gatekeeper (выполни `xattr -cr` как описано в Установке). Между
-  пересборками идентичность стабильна, так что Keychain ACL и
-  TCC grants переживают.
+- Дефолтная подпись — локальный self-signed cert, не Developer ID, не
+  нотаризован. Первый запуск такой свежеустановленной копии всё равно
+  упрётся в Gatekeeper (выполни `xattr -cr` как описано в Установке).
+  Между пересборками идентичность стабильна, так что Keychain ACL и
+  TCC grants переживают. Для публичной раздачи используй
+  `SIGNING_MODE=developer-id ./build-dmg.sh`.
 - `.untilQuit` audio retention работает по принципу best-effort.
   Force-quit или краш пропускают `applicationWillTerminate`, и
   cleanup делает startup sweep на следующем запуске.

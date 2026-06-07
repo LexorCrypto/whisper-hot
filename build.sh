@@ -5,7 +5,39 @@ cd "$(dirname "$0")"
 
 APP_NAME="WhisperHot"
 BUILD_CONFIG="${BUILD_CONFIG:-release}"
-SIGNING_COMMON_NAME="whisper-hot-local"
+SIGNING_MODE="${SIGNING_MODE:-local}"
+
+case "${SIGNING_MODE}" in
+    local|developer-id)
+        ;;
+    *)
+        echo "error: SIGNING_MODE must be 'local' or 'developer-id' (got '${SIGNING_MODE}')" >&2
+        exit 1
+        ;;
+esac
+
+if [[ "${SIGNING_MODE}" == "developer-id" ]]; then
+    SIGNING_COMMON_NAME="${DEVELOPER_ID_APPLICATION_IDENTITY:-${SIGNING_COMMON_NAME:-}}"
+    ENTITLEMENTS_FILE="${ENTITLEMENTS_FILE:-Resources/WhisperHot.entitlements}"
+
+    if [[ -z "${SIGNING_COMMON_NAME}" ]]; then
+        echo "error: DEVELOPER_ID_APPLICATION_IDENTITY is required for SIGNING_MODE=developer-id." >&2
+        echo "       Example:" >&2
+        echo "       export DEVELOPER_ID_APPLICATION_IDENTITY='Developer ID Application: Your Name (TEAMID)'" >&2
+        exit 1
+    fi
+    if [[ "${SIGNING_COMMON_NAME}" != Developer\ ID\ Application:* ]]; then
+        echo "error: SIGNING_MODE=developer-id requires a Developer ID Application identity." >&2
+        echo "       Got: ${SIGNING_COMMON_NAME}" >&2
+        exit 1
+    fi
+    if [[ ! -f "${ENTITLEMENTS_FILE}" ]]; then
+        echo "error: entitlements file not found: ${ENTITLEMENTS_FILE}" >&2
+        exit 1
+    fi
+else
+    SIGNING_COMMON_NAME="${SIGNING_COMMON_NAME:-whisper-hot-local}"
+fi
 
 # Script-owned tempdir, cleaned on any exit path. Used to capture
 # stderr from resolve_signing_identity so we are not subject to races
@@ -15,12 +47,11 @@ SIGNING_COMMON_NAME="whisper-hot-local"
 BUILD_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/whisper-hot-build.XXXXXX")"
 trap 'rm -rf "${BUILD_TMP_DIR}"' EXIT
 
-# Resolve the stable self-signed codesigning identity by SHA-1. We sign
-# by hash rather than by common name so a stray duplicate in the
-# keychain can never silently pick the wrong cert. If the identity is
-# missing we bail with a pointer to the one-time setup script instead
-# of falling back to ad-hoc signing — ad-hoc is the exact bug we're
-# here to avoid, and a silent downgrade would mask it.
+# Resolve the requested codesigning identity by SHA-1. We sign by hash
+# rather than by common name so a stray duplicate in the keychain can
+# never silently pick the wrong cert. If the identity is missing we bail
+# instead of falling back to ad-hoc signing — ad-hoc is the exact bug
+# we're here to avoid, and a silent downgrade would mask it.
 #
 # Note: we use `find-identity` WITHOUT `-v`. A self-signed leaf with no
 # user-installed trust is filtered out by `-v` (it returns
@@ -35,7 +66,7 @@ resolve_signing_identity() {
                 match($0, /[A-F0-9]{40}/)
                 h = substr($0, RSTART, RLENGTH)
                 split($0, parts, "\"")
-                if (parts[2] == cn) hashes[++n] = h
+                if (parts[2] == cn && !seen[h]++) hashes[++n] = h
             }
             END {
                 if (n == 1) { print hashes[1]; exit 0 }
@@ -110,8 +141,12 @@ case "${resolve_status}" in
         ;;
     2)
         echo "error: codesigning identity '${SIGNING_COMMON_NAME}' not found." >&2
-        echo "       Run: ./scripts/create-signing-identity.sh" >&2
-        echo "       (one-time setup; see the script header for details)" >&2
+        if [[ "${SIGNING_MODE}" == "developer-id" ]]; then
+            echo "       Install your Apple Developer ID Application certificate in Keychain Access." >&2
+        else
+            echo "       Run: ./scripts/create-signing-identity.sh" >&2
+            echo "       (one-time setup; see the script header for details)" >&2
+        fi
         exit 1
         ;;
     3)
@@ -131,7 +166,20 @@ case "${resolve_status}" in
         ;;
 esac
 
-codesign --force --deep --sign "${SIGNING_HASH}" --timestamp=none "${APP_BUNDLE}"
+if [[ "${SIGNING_MODE}" == "developer-id" ]]; then
+    echo "  mode: Developer ID + Hardened Runtime"
+    codesign --force \
+        --deep \
+        --options runtime \
+        --timestamp \
+        --entitlements "${ENTITLEMENTS_FILE}" \
+        --sign "${SIGNING_HASH}" \
+        "${APP_BUNDLE}"
+    codesign --verify --deep --strict --verbose=2 "${APP_BUNDLE}"
+else
+    echo "  mode: local self-signed"
+    codesign --force --deep --sign "${SIGNING_HASH}" --timestamp=none "${APP_BUNDLE}"
+fi
 
 echo "[5/5] Done"
 echo "Launch with: open \"${APP_BUNDLE}\""

@@ -2,13 +2,82 @@
 set -euo pipefail
 
 # Build a distributable .dmg containing WhisperHot.app and an
-# Applications-folder symlink. Ad-hoc signed, no notarization — fine for
-# personal / side-loading distribution. Run from the project root.
+# Applications-folder symlink. Defaults to local signing for personal
+# builds; SIGNING_MODE=developer-id enables Developer ID signing and
+# notarization. Run from the project root.
 
 cd "$(dirname "$0")"
 
 APP_NAME="WhisperHot"
 BUILD_OUT_DIR="${BUILD_OUT_DIR:-${HOME}/Library/Caches/WhisperHot-build}"
+SIGNING_MODE="${SIGNING_MODE:-local}"
+NOTARIZE="${NOTARIZE:-auto}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-WhisperHotNotary}"
+
+case "${SIGNING_MODE}" in
+  local|developer-id)
+    ;;
+  *)
+    echo "error: SIGNING_MODE must be 'local' or 'developer-id' (got '${SIGNING_MODE}')" >&2
+    exit 1
+    ;;
+esac
+
+case "${NOTARIZE}" in
+  auto|1|true|yes|on|0|false|no|off)
+    ;;
+  *)
+    echo "error: NOTARIZE must be auto, yes, or no (got '${NOTARIZE}')" >&2
+    exit 1
+    ;;
+esac
+
+should_notarize=false
+case "${NOTARIZE}" in
+  auto)
+    [[ "${SIGNING_MODE}" == "developer-id" ]] && should_notarize=true
+    ;;
+  1|true|yes|on)
+    should_notarize=true
+    ;;
+esac
+
+if [[ "${should_notarize}" == "true" && "${SIGNING_MODE}" != "developer-id" ]]; then
+  echo "error: notarization requires SIGNING_MODE=developer-id." >&2
+  exit 1
+fi
+
+DEVELOPER_ID_APPLICATION_IDENTITY="${DEVELOPER_ID_APPLICATION_IDENTITY:-${SIGNING_COMMON_NAME:-}}"
+if [[ "${SIGNING_MODE}" == "developer-id" && -z "${DEVELOPER_ID_APPLICATION_IDENTITY}" ]]; then
+  echo "error: DEVELOPER_ID_APPLICATION_IDENTITY is required for SIGNING_MODE=developer-id." >&2
+  echo "       Example:" >&2
+  echo "       export DEVELOPER_ID_APPLICATION_IDENTITY='Developer ID Application: Your Name (TEAMID)'" >&2
+  exit 1
+fi
+if [[ "${SIGNING_MODE}" == "developer-id" && "${DEVELOPER_ID_APPLICATION_IDENTITY}" != Developer\ ID\ Application:* ]]; then
+  echo "error: SIGNING_MODE=developer-id requires a Developer ID Application identity." >&2
+  echo "       Got: ${DEVELOPER_ID_APPLICATION_IDENTITY}" >&2
+  exit 1
+fi
+
+resolve_signing_identity() {
+  local cn="$1"
+  security find-identity -p codesigning 2>/dev/null \
+    | awk -v cn="${cn}" '
+      /^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]{40}[[:space:]]+"/ {
+        match($0, /[A-F0-9]{40}/)
+        h = substr($0, RSTART, RLENGTH)
+        split($0, parts, "\"")
+        if (parts[2] == cn && !seen[h]++) hashes[++n] = h
+      }
+      END {
+        if (n == 1) { print hashes[1]; exit 0 }
+        if (n == 0) { exit 2 }
+        for (i = 1; i <= n; i++) print hashes[i] > "/dev/stderr"
+        exit 3
+      }
+    '
+}
 
 # Sanity-check BUILD_OUT_DIR before we ever hand it to `rm -rf`. The env
 # override is convenient for tooling but it must not be a shared or root
@@ -82,6 +151,59 @@ hdiutil create \
 
 echo "[6/6] Stage cleanup handled by EXIT trap"
 
+if [[ "${SIGNING_MODE}" == "developer-id" ]]; then
+  echo "[sign] Signing DMG with Developer ID"
+  DMG_SIGNING_DUPS_FILE="${STAGE_DIR}/dmg-signing-dups"
+  set +e
+  DMG_SIGNING_HASH="$(resolve_signing_identity "${DEVELOPER_ID_APPLICATION_IDENTITY}" 2>"${DMG_SIGNING_DUPS_FILE}")"
+  resolve_status=$?
+  set -e
+
+  case "${resolve_status}" in
+    0)
+      echo "  using identity: ${DMG_SIGNING_HASH} (${DEVELOPER_ID_APPLICATION_IDENTITY})"
+      ;;
+    2)
+      echo "error: Developer ID Application identity not found:" >&2
+      echo "       ${DEVELOPER_ID_APPLICATION_IDENTITY}" >&2
+      exit 1
+      ;;
+    3)
+      echo "error: multiple identities named '${DEVELOPER_ID_APPLICATION_IDENTITY}':" >&2
+      if [[ -s "${DMG_SIGNING_DUPS_FILE}" ]]; then
+        sed 's/^/       - /' "${DMG_SIGNING_DUPS_FILE}" >&2
+      fi
+      exit 1
+      ;;
+    *)
+      echo "error: resolve_signing_identity exited ${resolve_status} (unexpected)" >&2
+      exit 1
+      ;;
+  esac
+
+  codesign --force --sign "${DMG_SIGNING_HASH}" --timestamp "${DMG_OUT}"
+  codesign --verify --verbose=2 "${DMG_OUT}"
+fi
+
+if [[ "${should_notarize}" == "true" ]]; then
+  echo "[notary] Submitting DMG to Apple notarization"
+  if ! xcrun notarytool --help >/dev/null 2>&1; then
+    echo "error: xcrun notarytool is unavailable. Install current Xcode or Xcode Command Line Tools." >&2
+    exit 1
+  fi
+
+  xcrun notarytool submit "${DMG_OUT}" \
+    --keychain-profile "${NOTARY_PROFILE}" \
+    --wait
+
+  echo "[notary] Stapling notarization ticket"
+  xcrun stapler staple -v "${DMG_OUT}"
+  xcrun stapler validate -v "${DMG_OUT}"
+
+  echo "[notary] Verifying Gatekeeper assessment"
+  spctl -a -vv --type open --context context:primary-signature "${DMG_OUT}"
+fi
+
 echo ""
 echo "DMG ready: ${DMG_OUT}"
 echo ""
@@ -90,10 +212,18 @@ echo "  1. open \"${DMG_OUT}\""
 echo "  2. drag ${APP_NAME}.app to the Applications shortcut"
 echo "  3. eject the DMG volume"
 echo ""
-echo "First launch of the INSTALLED copy (from /Applications) will hit"
-echo "Gatekeeper because the build is ad-hoc signed, not notarized:"
-echo "  right-click /Applications/${APP_NAME}.app → Open,"
-echo "  or System Settings → Privacy & Security → 'Open Anyway'."
+if [[ "${SIGNING_MODE}" == "developer-id" && "${should_notarize}" == "true" ]]; then
+  echo "Developer ID notarization is complete; Gatekeeper should accept"
+  echo "the DMG and installed app without Open Anyway."
+elif [[ "${SIGNING_MODE}" == "developer-id" ]]; then
+  echo "Developer ID signing is complete, but notarization was skipped;"
+  echo "Gatekeeper may still warn until you build with NOTARIZE=yes."
+else
+  echo "First launch of the INSTALLED copy (from /Applications) will hit"
+  echo "Gatekeeper because the build is locally signed, not notarized:"
+  echo "  right-click /Applications/${APP_NAME}.app -> Open,"
+  echo "  or System Settings -> Privacy & Security -> 'Open Anyway'."
+fi
 echo ""
 echo "Do NOT launch ${APP_NAME}.app directly from the mounted DMG volume —"
 echo "SMAppService and the startup sweep assume a stable install path."

@@ -27,6 +27,10 @@ Emergency hotfix. `0.7.1` пытался ремонтировать Keychain ACL
 - `MainWindowModel.readProviderSetupStatus` теперь работает в no-Keychain
   mode для cloud-провайдеров на launch/UI refresh.
 - Добавлены L10n строки для deferred provider key check.
+- Подготовлен Developer ID distribution path: `SIGNING_MODE=developer-id`
+  подписывает `.app` с Hardened Runtime/audio-input entitlement, DMG
+  подписывается Developer ID Application certificate, отправляется в
+  Apple notarization и staple-ится через `xcrun stapler`.
 
 ### Проверка
 

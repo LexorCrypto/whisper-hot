@@ -330,6 +330,17 @@ codesigning` по CN. Если identity отсутствует или найде
 Ad-hoc fallback не предусмотрен специально: тихий откат на ad-hoc
 был бы именно тем регрессом, от которого мы ушли.
 
+Для публичной раздачи `build.sh` поддерживает
+`SIGNING_MODE=developer-id`. В этом режиме identity должна быть
+Apple-issued `Developer ID Application: ... (TEAMID)`, а подпись
+получает Hardened Runtime (`--options runtime`), timestamp и
+`Resources/WhisperHot.entitlements` с audio-input entitlement для
+доступа к микрофону. `build-dmg.sh` в том же режиме подписывает DMG,
+заливает его через `xcrun notarytool submit --wait`, staple-ит ticket
+через `xcrun stapler`, и проверяет Gatekeeper assessment. Credentials
+для `notarytool` хранятся в Keychain профилем `WhisperHotNotary`,
+который создаётся интерактивным `scripts/setup-notary-profile.sh`.
+
 В 0.7.1 была попытка repair'ить старые Keychain item ACL через
 `kSecAttrAccess`; на живых user items это могло вызвать повторяющийся
 macOS prompt-loop. 0.7.2 откатывает этот путь полностью. Главное окно
