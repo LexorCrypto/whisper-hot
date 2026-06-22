@@ -1,3 +1,13 @@
+<!-- RETIRED → see 🔄 STATE/HANDOFF #5 (ADR-0026 github_state). -->
+> [!IMPORTANT]
+> **Этот файл retired (ADR-0026 github_state).** Живое состояние задач и хендофф теперь в
+> закреплённых issue: 🔄 **STATE/HANDOFF [#5](https://github.com/LexorCrypto/whisper-hot/issues/5)**
+> → по указателю `context` → 📌 **CONTEXT #2**. Активная работа **мигрирована в Issues**:
+> релиз v0.7.2 (Developer ID + нотаризация) → **#3** (с resume-runbook), backlog
+> (Windows-порт / subprocess cancellation / MenuBar-тесты) → **#4**. Содержимое НИЖЕ —
+> **сохранённый нотаризационный runbook** (история); `close-session` дотомбстоунит после
+> релиза. **Не дописывать статус сюда** — пиши в 🔄 #5.
+
 # STATUS — WhisperHot Developer ID release blocked on Apple notarization
 
 Дата: 2026-06-07

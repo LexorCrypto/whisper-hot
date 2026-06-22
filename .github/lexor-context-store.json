@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "min_reader_version": 1,
+  "state_issue": 5,
+  "context_issue": 2,
+  "tombstone_verified_cycles": 2,
+  "labels": {
+    "status_label_id": "LA_kwDOSDrsO88AAAACoZvrhQ",
+    "context_label_id": "LA_kwDOSDrsO88AAAACoZvrcw",
+    "taxonomy": []
+  }
+}
