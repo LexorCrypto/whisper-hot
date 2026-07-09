@@ -24,8 +24,10 @@ close_session.issue_language = ru
 
 ```bash
 swift build -c release      # компиляция
-./build.sh                  # подписанный .app bundle
-./build-dmg.sh              # DMG для распространения
+./build.sh                  # .app bundle (по умолчанию локальная самоподпись; dev-запуск)
+./build-dmg.sh              # DMG для распространения — ПО УМОЛЧАНИЮ Developer ID + Hardened
+                            # Runtime + нотаризация Apple + staple (автодетект сертификата из
+                            # keychain). Быстрый неподписанный опт-аут: SIGNING_MODE=local ./build-dmg.sh
 ```
 
 ## Структура проекта
