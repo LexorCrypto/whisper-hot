@@ -2,15 +2,18 @@
 set -euo pipefail
 
 # Build a distributable .dmg containing WhisperHot.app and an
-# Applications-folder symlink. Defaults to local signing for personal
-# builds; SIGNING_MODE=developer-id enables Developer ID signing and
-# notarization. Run from the project root.
+# Applications-folder symlink. By default it runs the full release-correct
+# flow: Developer ID signing + Hardened Runtime + notarization + staple,
+# auto-detecting the Developer ID Application identity from the keychain so
+# no env var is required. For a quick unsigned personal build that skips
+# notarization, run: SIGNING_MODE=local ./build-dmg.sh
+# Run from the project root.
 
 cd "$(dirname "$0")"
 
 APP_NAME="WhisperHot"
 BUILD_OUT_DIR="${BUILD_OUT_DIR:-${HOME}/Library/Caches/WhisperHot-build}"
-SIGNING_MODE="${SIGNING_MODE:-local}"
+SIGNING_MODE="${SIGNING_MODE:-developer-id}"
 NOTARIZE="${NOTARIZE:-auto}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-WhisperHotNotary}"
 
@@ -47,12 +50,61 @@ if [[ "${should_notarize}" == "true" && "${SIGNING_MODE}" != "developer-id" ]]; 
   exit 1
 fi
 
+# Discover the Developer ID Application identity from the keychain so a
+# release build "just works" without the caller exporting an env var. Emits
+# the single common name on stdout; on 0 or >1 matches it lists candidates
+# on stderr and exits non-zero. Success and failure use disjoint streams, so
+# the caller can safely merge them with 2>&1 and branch on the exit code.
+auto_detect_developer_id() {
+  security find-identity -v -p codesigning 2>/dev/null \
+    | awk '
+      /"Developer ID Application:/ {
+        # Key on the cert SHA-1 so two identities that share a common name
+        # but differ by hash count as two candidates (ambiguous -> fail),
+        # not one. Fall back to the whole line if no hash is present.
+        key = (match($0, /[A-F0-9]{40}/)) ? substr($0, RSTART, RLENGTH) : $0
+        split($0, parts, "\"")
+        cn = parts[2]
+        if (!seen[key]++) names[++n] = cn
+      }
+      END {
+        if (n == 1) { print names[1]; exit 0 }
+        if (n == 0) { exit 2 }
+        for (i = 1; i <= n; i++) print names[i] > "/dev/stderr"
+        exit 3
+      }
+    '
+}
+
 DEVELOPER_ID_APPLICATION_IDENTITY="${DEVELOPER_ID_APPLICATION_IDENTITY:-${SIGNING_COMMON_NAME:-}}"
 if [[ "${SIGNING_MODE}" == "developer-id" && -z "${DEVELOPER_ID_APPLICATION_IDENTITY}" ]]; then
-  echo "error: DEVELOPER_ID_APPLICATION_IDENTITY is required for SIGNING_MODE=developer-id." >&2
-  echo "       Example:" >&2
-  echo "       export DEVELOPER_ID_APPLICATION_IDENTITY='Developer ID Application: Your Name (TEAMID)'" >&2
-  exit 1
+  set +e
+  detected_identity="$(auto_detect_developer_id 2>&1)"
+  autodetect_status=$?
+  set -e
+  case "${autodetect_status}" in
+    0)
+      DEVELOPER_ID_APPLICATION_IDENTITY="${detected_identity}"
+      echo "[sign] auto-detected Developer ID identity: ${DEVELOPER_ID_APPLICATION_IDENTITY}"
+      ;;
+    2)
+      echo "error: no 'Developer ID Application' identity found in the keychain." >&2
+      echo "       Install your Apple Developer ID Application certificate, or run a" >&2
+      echo "       quick unsigned build with: SIGNING_MODE=local ./build-dmg.sh" >&2
+      exit 1
+      ;;
+    3)
+      echo "error: multiple 'Developer ID Application' identities found:" >&2
+      printf '%s\n' "${detected_identity}" | sed 's/^/       - /' >&2
+      echo "       Pick one explicitly:" >&2
+      echo "       export DEVELOPER_ID_APPLICATION_IDENTITY='Developer ID Application: Your Name (TEAMID)'" >&2
+      exit 1
+      ;;
+    *)
+      echo "error: auto_detect_developer_id exited ${autodetect_status} (unexpected)" >&2
+      exit 1
+      ;;
+  esac
 fi
 if [[ "${SIGNING_MODE}" == "developer-id" && "${DEVELOPER_ID_APPLICATION_IDENTITY}" != Developer\ ID\ Application:* ]]; then
   echo "error: SIGNING_MODE=developer-id requires a Developer ID Application identity." >&2
@@ -97,8 +149,13 @@ esac
 
 APP_BUNDLE="${BUILD_OUT_DIR}/${APP_NAME}.app"
 
-echo "[1/6] Building ${APP_NAME}.app via build.sh"
-./build.sh
+echo "[1/6] Building ${APP_NAME}.app via build.sh (signing mode: ${SIGNING_MODE})"
+# Propagate the resolved mode and identity so the .app inside the DMG is
+# signed exactly like the DMG. Without this, build.sh would fall back to its
+# own default and the app could be self-signed inside a Developer ID DMG.
+SIGNING_MODE="${SIGNING_MODE}" \
+DEVELOPER_ID_APPLICATION_IDENTITY="${DEVELOPER_ID_APPLICATION_IDENTITY}" \
+  ./build.sh
 
 if [[ ! -d "${APP_BUNDLE}" ]]; then
   echo "error: expected ${APP_BUNDLE} after build.sh, not found" >&2
