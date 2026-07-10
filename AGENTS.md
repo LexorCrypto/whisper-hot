@@ -15,9 +15,16 @@ Also load the global **Lexor Workspace** rules from `~/.codex/AGENTS.md` if pres
 
 ## Codex-specific deltas
 
+- **Sync from GitHub at session start (before anything else).** You cannot run the
+  `git-sync-start` Claude skill, so do the equivalent by hand *first*: `git fetch
+  origin`; on the default branch with a clean tree → `git pull --ff-only`; in every
+  other case (dirty tree, feature branch, detached HEAD, no upstream, shallow, linked
+  worktree, submodule/LFS, untracked conflict) **report and do not auto-merge**. Fetch
+  again before pushing; never force onto a shared branch.
 - **Tooling surface differs.** Claude-only skills (gstack `/…`, `fusion-audit`,
-  `close-session`, `lexor-memory`) and Claude-side MCP servers are **not** available to
-  you. Use your own equivalents; never claim to have run a skill or tool you cannot run.
+  `close-session`, `lexor-memory`, `git-sync-start`) and Claude-side MCP servers are
+  **not** available to you. Use your own equivalents; never claim to have run a skill or
+  tool you cannot run.
 - **LightRAG-first still applies**, but query it through *your* configured access (the
   LightRAG HTTP API / your MCP), not the Claude MCP tool. If you have no LightRAG access
   in this run, say so — do not skip the step silently.
