@@ -223,6 +223,19 @@ export default function Hero() {
                 <span className="ml-2 text-sm text-fg-mute">старт/стоп</span>
               </div>
 
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-fg-mute">или всего одной клавишей</span>
+                <kbd className="kbd gap-1.5" aria-label="клавиша Fn">
+                  <span aria-hidden="true">🌐</span> Fn
+                </kbd>
+                <span
+                  className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] font-medium text-accent"
+                  title="macOS резервирует Fn под Dictation и Show Emoji — включается тумблером в настройках при выданном доступе Input Monitoring"
+                >
+                  экспериментально
+                </span>
+              </div>
+
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <a href={RELEASES_URL} className="btn btn-primary">
                   Скачать для macOS
