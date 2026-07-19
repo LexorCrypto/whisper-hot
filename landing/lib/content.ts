@@ -1,8 +1,9 @@
 import type { ProviderId } from "@/store/useAppStore";
+import { BUILD_VERSION } from "@/lib/version";
 
 export const REPO_URL = "https://github.com/LexorCrypto/whisper-hot";
 export const RELEASES_URL = `${REPO_URL}/releases/latest`;
-export const VERSION = "0.7.2";
+export const VERSION = BUILD_VERSION;
 
 /* ---------- Navigation ---------- */
 export interface NavLink {

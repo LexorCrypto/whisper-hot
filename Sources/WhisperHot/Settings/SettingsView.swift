@@ -58,7 +58,7 @@ struct SettingsView: View {
     @AppStorage(Preferences.Key.language) private var language: TranscriptionLanguage = .auto
     @AppStorage(Preferences.Key.autoPaste) private var autoPaste: Bool = Preferences.Defaults.autoPaste
     @AppStorage(Preferences.Key.sounds) private var sounds: Bool = Preferences.Defaults.sounds
-    @AppStorage(Preferences.Key.indicatorStyle) private var indicatorStyle: IndicatorStyle = .menubar
+    @AppStorage(Preferences.Key.indicatorStyle) private var indicatorStyle: IndicatorStyle = .minimal
     @AppStorage(Preferences.Key.postProcessingEnabled) private var postProcessingEnabled: Bool = Preferences.Defaults.postProcessingEnabled
     @AppStorage(Preferences.Key.postProcessingPreset) private var postProcessingPreset: PostProcessingPreset = .cleanup
     @AppStorage(Preferences.Key.postProcessingCustomPrompt) private var postProcessingCustomPrompt: String = ""

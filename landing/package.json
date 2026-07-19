@@ -4,7 +4,9 @@
   "private": true,
   "description": "Landing page for WhisperHot — macOS speech-to-text",
   "scripts": {
+    "predev": "node scripts/sync-version.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/sync-version.mjs",
     "build": "next build",
     "start": "next start"
   },
