@@ -1,0 +1,26 @@
+{
+  "name": "whisperhot-landing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Landing page for WhisperHot — macOS speech-to-text",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "15.5.20",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "zustand": "5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.13",
+    "@types/node": "22.10.2",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "postcss": "8.5.6",
+    "tailwindcss": "4.1.13",
+    "typescript": "5.7.3"
+  }
+}
