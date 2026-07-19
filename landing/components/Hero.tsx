@@ -277,7 +277,7 @@ export default function Hero() {
                   <span className="h-3 w-3 rounded-full" style={{ background: "#ff5f57" }} />
                   <span className="h-3 w-3 rounded-full" style={{ background: "#febc2e" }} />
                   <span className="h-3 w-3 rounded-full" style={{ background: "#28c840" }} />
-                  <p className="ml-2 text-sm font-medium text-fg-dim">WhisperHot — Studio</p>
+                  <p className="ml-2 text-sm font-medium text-fg-dim">WhisperHot — запись</p>
                 </div>
 
                 <div className="space-y-5 p-5 md:p-6">

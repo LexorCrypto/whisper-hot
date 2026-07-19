@@ -69,7 +69,7 @@ export default function FooterCTA() {
           </div>
 
           <p className="mt-4 text-xs text-fg-mute">
-            macOS 13+ · Apple Silicon · self-signed сборка
+            macOS 13+ · Apple Silicon · подпись Developer ID (без нотаризации)
           </p>
           <p className="mt-2 text-sm text-fg-dim">
             Совет напоследок: начни с{" "}

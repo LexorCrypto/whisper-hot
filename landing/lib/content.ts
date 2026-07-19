@@ -91,8 +91,8 @@ export const FEATURES: Feature[] = [
   },
   {
     icon: "waveform",
-    title: "5 стилей индикатора",
-    text: "От незаметного menubar-only до широкой Studio-панели с плотной RMS-волной в духе SuperWhisper.",
+    title: "3 стиля индикатора",
+    text: "Минимальный, средний и большой — живая RMS-волна с фирменным градиентом. Всегда видно, что идёт запись.",
   },
   {
     icon: "dictionary",
