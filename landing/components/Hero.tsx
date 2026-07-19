@@ -236,6 +236,11 @@ export default function Hero() {
                 </span>
               </div>
 
+              <p className="mt-2 max-w-md text-xs text-fg-mute">
+                Экспериментально: нужен доступ Input Monitoring, а Fn может быть
+                занята Dictation / Show Emoji.
+              </p>
+
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <a href={RELEASES_URL} className="btn btn-primary">
                   Скачать для macOS
