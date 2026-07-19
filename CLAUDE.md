@@ -47,7 +47,7 @@ swift build -c release      # компиляция
 - `Sources/WhisperHot/MenuBarController.swift` — state machine hub (~1030 строк), menubar items: Provider submenu + Auto-offline toggle (ADR-014) + Settings/History/About; владеет `transcriptionTask` + epoch guard и sleep/wake observers (ADR-015)
 - `Sources/WhisperHot/ContextRouter/` — контекстный роутинг (bundle ID → preset)
 - `Sources/WhisperHot/PostProcessing/` — LLM пост-обработка (4 провайдера)
-- `Sources/WhisperHot/Indicator/` — индикаторы записи (5 стилей, включая Studio)
+- `Sources/WhisperHot/Indicator/` — индикаторы записи (3 стиля: минимальный / средний / большой)
 - `Sources/WhisperHot/Settings/` — Preferences + SettingsView (sidebar, 5 секций)
 - `Sources/WhisperHot/Localization/` — L10n.swift (русский/английский UI, single source для всех UI-строк)
 - `Sources/WhisperHot/LocalSetup/` — WhisperInstaller + UpdateChecker
