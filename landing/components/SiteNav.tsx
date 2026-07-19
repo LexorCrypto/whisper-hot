@@ -147,14 +147,14 @@ export default function SiteNav() {
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-line">
-      <div className="container-wh flex h-16 items-center justify-between gap-4">
+      <div className="container-wh flex h-16 items-center justify-between gap-2 sm:gap-4">
         <a href="#" className="flex shrink-0 items-center gap-2.5" aria-label="WhisperHot — наверх">
           <LogoMark />
           <span className="text-[15px] font-semibold tracking-tight text-fg">WhisperHot</span>
-          <span className="font-mono text-[11px] text-fg-mute">v{VERSION}</span>
+          <span className="hidden font-mono text-[11px] text-fg-mute sm:inline">v{VERSION}</span>
         </a>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Секции страницы">
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Секции страницы">
           {NAV_LINKS.map((link) => {
             const active = activeSection === link.id;
             return (
@@ -196,7 +196,7 @@ export default function SiteNav() {
             onClick={() => setMenuOpen((v) => !v)}
             aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
             aria-expanded={menuOpen}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-dim transition-colors hover:border-line-strong hover:text-fg md:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-dim transition-colors hover:border-line-strong hover:text-fg lg:hidden"
           >
             <MenuIcon open={menuOpen} />
           </button>
@@ -204,7 +204,7 @@ export default function SiteNav() {
       </div>
 
       {menuOpen && (
-        <div className="glass border-t border-line md:hidden">
+        <div className="glass border-t border-line lg:hidden">
           <nav className="container-wh flex flex-col py-2" aria-label="Мобильная навигация">
             {NAV_LINKS.map((link) => {
               const active = activeSection === link.id;

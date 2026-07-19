@@ -194,11 +194,11 @@ export default function Hero() {
   return (
     <section
       id="hero"
-      className="scroll-mt-[92px] relative min-h-[92vh] flex items-center pt-28 pb-20"
+      className="scroll-mt-[92px] relative min-h-[92vh] flex items-center overflow-x-clip pt-28 pb-20"
     >
       <div className="container-wh">
-        <div className="grid items-center gap-16 lg:grid-cols-2 lg:gap-12">
-          <Reveal>
+        <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2 lg:gap-12">
+          <Reveal className="min-w-0">
             <div>
               <p className="eyebrow">macOS · speech-to-text</p>
               <h1 className="mt-4 text-5xl md:text-7xl font-semibold tracking-tight leading-[1.05]">
@@ -261,7 +261,7 @@ export default function Hero() {
             </div>
           </Reveal>
 
-          <Reveal delay={120}>
+          <Reveal delay={120} className="min-w-0">
             <div className="relative">
               <div
                 aria-hidden="true"
