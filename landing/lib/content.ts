@@ -1,8 +1,9 @@
 import type { ProviderId } from "@/store/useAppStore";
+import { BUILD_VERSION } from "@/lib/version";
 
 export const REPO_URL = "https://github.com/LexorCrypto/whisper-hot";
 export const RELEASES_URL = `${REPO_URL}/releases/latest`;
-export const VERSION = "0.7.2";
+export const VERSION = BUILD_VERSION;
 
 /* ---------- Navigation ---------- */
 export interface NavLink {
@@ -90,8 +91,8 @@ export const FEATURES: Feature[] = [
   },
   {
     icon: "waveform",
-    title: "5 стилей индикатора",
-    text: "От незаметного menubar-only до широкой Studio-панели с плотной RMS-волной в духе SuperWhisper.",
+    title: "3 стиля индикатора",
+    text: "Минимальный, средний и большой — живая RMS-волна с фирменным градиентом. Всегда видно, что идёт запись.",
   },
   {
     icon: "dictionary",

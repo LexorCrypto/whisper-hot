@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import Reveal from "@/components/Reveal";
-import { REPO_URL, RELEASES_URL, VERSION } from "@/lib/content";
+import { useAppStore } from "@/store/useAppStore";
+import { REPO_URL, RELEASES_URL } from "@/lib/content";
 
 const INSTALL_COMMAND = "xattr -cr /Applications/WhisperHot.app";
 const COPY_RESET_DELAY_MS = 2000;
 
 export default function FooterCTA() {
   const [copied, setCopied] = useState(false);
+  const appVersion = useAppStore((s) => s.appVersion);
 
   async function handleCopy() {
     try {
@@ -40,7 +42,7 @@ export default function FooterCTA() {
               rel="noreferrer"
               className="btn btn-primary"
             >
-              Скачать {VERSION}
+              Скачать {appVersion}
             </a>
             <a
               href={REPO_URL}
@@ -67,7 +69,7 @@ export default function FooterCTA() {
           </div>
 
           <p className="mt-4 text-xs text-fg-mute">
-            macOS 13+ · Apple Silicon · self-signed сборка
+            macOS 13+ · Apple Silicon · подпись Developer ID (без нотаризации)
           </p>
           <p className="mt-2 text-sm text-fg-dim">
             Совет напоследок: начни с{" "}
@@ -78,7 +80,7 @@ export default function FooterCTA() {
 
         <div className="mt-16 flex flex-col items-center justify-between gap-3 border-t border-line py-8 text-sm text-fg-mute sm:flex-row">
           <p>
-            WhisperHot v{VERSION} · Apache-2.0
+            WhisperHot v{appVersion} · Apache-2.0
           </p>
           <div className="flex items-center gap-5">
             <a

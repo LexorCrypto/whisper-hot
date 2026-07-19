@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { NAV_LINKS, RELEASES_URL, VERSION } from "@/lib/content";
+import { NAV_LINKS, RELEASES_URL } from "@/lib/content";
 
 /** Five vertical waveform bars, gradient accent → violet. */
 function LogoMark() {
@@ -109,6 +109,7 @@ export default function SiteNav() {
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const activeSection = useAppStore((s) => s.activeSection);
   const setActiveSection = useAppStore((s) => s.setActiveSection);
+  const appVersion = useAppStore((s) => s.appVersion);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Scroll-spy: highlight the nav link for the section currently crossing
@@ -151,7 +152,7 @@ export default function SiteNav() {
         <a href="#" className="flex shrink-0 items-center gap-2.5" aria-label="WhisperHot — наверх">
           <LogoMark />
           <span className="text-[15px] font-semibold tracking-tight text-fg">WhisperHot</span>
-          <span className="hidden font-mono text-[11px] text-fg-mute sm:inline">v{VERSION}</span>
+          <span className="hidden font-mono text-[11px] text-fg-mute sm:inline">v{appVersion}</span>
         </a>
 
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Секции страницы">

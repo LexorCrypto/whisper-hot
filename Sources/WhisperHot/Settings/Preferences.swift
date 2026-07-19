@@ -53,7 +53,7 @@ public enum Preferences {
         static let language = TranscriptionLanguage.auto.rawValue
         static let autoPaste = true
         static let sounds = true
-        static let indicatorStyle = IndicatorStyle.menubar.rawValue
+        static let indicatorStyle = IndicatorStyle.minimal.rawValue
         static let postProcessingEnabled = false
         static let postProcessingPreset = PostProcessingPreset.cleanup.rawValue
         static let postProcessingCustomPrompt = ""
@@ -229,7 +229,7 @@ public enum Preferences {
 
     static var indicatorStyle: IndicatorStyle {
         let raw = UserDefaults.standard.string(forKey: Key.indicatorStyle) ?? Defaults.indicatorStyle
-        return IndicatorStyle(rawValue: raw) ?? .menubar
+        return IndicatorStyle(rawValue: raw) ?? .minimal
     }
 
     // MARK: - Post-processing accessors
@@ -449,11 +449,9 @@ enum AudioRetention: String, CaseIterable, Identifiable, Sendable {
 /// Recording indicator style. Block 9 renders the actual UI for each;
 /// Block 8 persists the choice.
 enum IndicatorStyle: String, CaseIterable, Identifiable {
-    case menubar
-    case pill
-    case waveform
-    case floatingCapsule
-    case studio
+    case minimal
+    case medium
+    case large
 
     var id: String { rawValue }
 }

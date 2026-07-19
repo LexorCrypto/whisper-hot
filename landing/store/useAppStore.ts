@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { BUILD_VERSION } from "@/lib/version";
 
 export type Theme = "dark" | "light";
 export type ProviderId = "openai" | "openrouter" | "groq" | "polza" | "local";
@@ -37,6 +38,10 @@ export interface AppState {
   /** Section id currently in view, used for nav scroll-spy. */
   activeSection: string;
   setActiveSection: (id: string) => void;
+
+  /** Displayed app version; starts at build-time value, refreshed from the latest GitHub Release. */
+  appVersion: string;
+  setAppVersion: (v: string) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -65,4 +70,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   activeSection: "hero",
   setActiveSection: (id) => set({ activeSection: id }),
+
+  appVersion: BUILD_VERSION,
+  setAppVersion: (v) => set({ appVersion: v }),
 }));

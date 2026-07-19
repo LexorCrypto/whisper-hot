@@ -343,11 +343,9 @@ enum L10n {
     // MARK: - Indicator styles
     static func indicatorStyleName(_ s: IndicatorStyle) -> String {
         switch s {
-        case .menubar: return lang == .ru ? "Только менюбар" : "Menubar only"
-        case .pill: return lang == .ru ? "Мини (пилюля)" : "Mini (pill)"
-        case .waveform: return lang == .ru ? "Классика (волна)" : "Classic (waveform)"
-        case .floatingCapsule: return lang == .ru ? "Плавающая капсула (premium)" : "Floating capsule (premium)"
-        case .studio: return lang == .ru ? "Студия (широкая панель)" : "Studio (wide panel)"
+        case .minimal: return lang == .ru ? "Минимальный" : "Minimal"
+        case .medium: return lang == .ru ? "Средний" : "Medium"
+        case .large: return lang == .ru ? "Большой" : "Large"
         }
     }
 

@@ -4,8 +4,8 @@ import SwiftUI
 /// Owns the floating recording indicator panel.
 /// - Reads the current `Preferences.indicatorStyle` each `show()` so the user
 ///   can switch modes in Settings and see the change on the next recording.
-/// - Menubar-only mode shows no panel at all (the status item already signals
-///   recording state via its SF Symbol flip).
+/// - Renders one of three styles (minimal / medium / large); the menu bar
+///   status item also flips its SF Symbol to signal recording state.
 /// - Panel is non-activating, appears on all Spaces, survives Stage Manager
 ///   and Spaces transitions, and never steals focus from the target app.
 @MainActor
@@ -19,10 +19,6 @@ final class IndicatorController {
 
     func show() {
         let style = Preferences.indicatorStyle
-        guard style != .menubar else {
-            hide()
-            return
-        }
 
         viewModel.start()
 
@@ -84,16 +80,12 @@ final class IndicatorController {
     private func makeHostingView(for style: IndicatorStyle) -> NSHostingView<AnyView> {
         let root: AnyView
         switch style {
-        case .pill:
-            root = AnyView(MiniPillView(viewModel: viewModel))
-        case .waveform:
-            root = AnyView(ClassicWaveformView(viewModel: viewModel))
-        case .floatingCapsule:
-            root = AnyView(FloatingCapsuleView(viewModel: viewModel))
-        case .studio:
-            root = AnyView(StudioPanelView(viewModel: viewModel))
-        case .menubar:
-            root = AnyView(EmptyView())
+        case .minimal:
+            root = AnyView(MinimalIndicatorView(viewModel: viewModel))
+        case .medium:
+            root = AnyView(MediumIndicatorView(viewModel: viewModel))
+        case .large:
+            root = AnyView(LargeIndicatorView(viewModel: viewModel))
         }
         let host = NSHostingView(rootView: root)
         host.translatesAutoresizingMaskIntoConstraints = true

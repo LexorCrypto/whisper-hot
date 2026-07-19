@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ThemeSync from "@/components/ThemeSync";
+import VersionSync from "@/components/VersionSync";
 
 export const metadata: Metadata = {
   title: "WhisperHot — голос в текст под курсором для macOS",
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen antialiased">
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
         <ThemeSync />
+        <VersionSync />
         {children}
       </body>
     </html>
