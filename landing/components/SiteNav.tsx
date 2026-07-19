@@ -172,7 +172,7 @@ export default function SiteNav() {
           })}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             onClick={toggleTheme}
@@ -186,7 +186,7 @@ export default function SiteNav() {
             href={RELEASES_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-primary h-9 rounded-lg px-4 text-[13px]"
+            className="btn btn-primary h-9 rounded-lg px-3 text-[13px] sm:px-4"
           >
             Скачать
           </a>
