@@ -1,26 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Reveal from "@/components/Reveal";
 import { useAppStore } from "@/store/useAppStore";
 import { REPO_URL, RELEASES_URL } from "@/lib/content";
 
-const INSTALL_COMMAND = "xattr -cr /Applications/WhisperHot.app";
-const COPY_RESET_DELAY_MS = 2000;
-
 export default function FooterCTA() {
-  const [copied, setCopied] = useState(false);
   const appVersion = useAppStore((s) => s.appVersion);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(INSTALL_COMMAND);
-      setCopied(true);
-      setTimeout(() => setCopied(false), COPY_RESET_DELAY_MS);
-    } catch {
-      // Clipboard API unavailable or denied — nothing sensible to fall back to.
-    }
-  }
 
   return (
     <section id="download" className="scroll-mt-[92px] py-24 md:py-32">
@@ -54,22 +39,23 @@ export default function FooterCTA() {
             </a>
           </div>
 
-          <div className="card mt-8 flex items-center justify-between gap-4 p-4 text-left">
-            <code className="overflow-x-auto whitespace-nowrap font-mono text-sm text-fg">
-              {INSTALL_COMMAND}
-            </code>
-            <button
-              type="button"
-              onClick={handleCopy}
-              aria-label="Скопировать команду установки в буфер обмена"
-              className="btn btn-ghost h-9 shrink-0 px-4 text-xs"
+          <div className="card mt-8 flex items-center gap-3 p-4 text-left">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-free/15 text-free"
+              aria-hidden="true"
             >
-              {copied ? "Скопировано!" : "Копировать"}
-            </button>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+            <p className="text-sm text-fg-dim">
+              <span className="font-semibold text-fg">Подписано и нотаризовано Apple.</span>{" "}
+              Просто перетащи в Applications и открой — без предупреждений Gatekeeper и без Терминала.
+            </p>
           </div>
 
           <p className="mt-4 text-xs text-fg-mute">
-            macOS 13+ · Apple Silicon · подпись Developer ID (без нотаризации)
+            macOS 13+ · Apple Silicon · подпись Developer ID · нотаризовано Apple
           </p>
           <p className="mt-2 text-sm text-fg-dim">
             Совет напоследок: начни с{" "}

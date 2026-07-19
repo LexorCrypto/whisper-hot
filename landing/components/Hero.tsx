@@ -256,7 +256,7 @@ export default function Hero() {
               </div>
 
               <p className="mt-5 text-xs text-fg-mute">
-                macOS 13+ · Apple Silicon · рекомендуем Groq — бесплатно
+                macOS 13+ · Apple Silicon · нотаризовано Apple · рекомендуем Groq
               </p>
             </div>
           </Reveal>
