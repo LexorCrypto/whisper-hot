@@ -8,10 +8,16 @@ import SwiftUI
 ///   status item also flips its SF Symbol to signal recording state.
 /// - Panel is non-activating, appears on all Spaces, survives Stage Manager
 ///   and Spaces transitions, and never steals focus from the target app.
+/// - Stays above every other window for the whole recording: `.statusBar`
+///   level floats over normal windows, and front is re-asserted on each app
+///   activation so a newly activated app can never cover the HUD.
 @MainActor
 final class IndicatorController {
     private let viewModel: IndicatorViewModel
     private var panel: NSPanel?
+    /// Observes app activations while the panel is visible so we can re-raise
+    /// it above any window that a newly activated app brings forward.
+    private var activationObserver: NSObjectProtocol?
 
     init(rmsProvider: @escaping () -> Float) {
         self.viewModel = IndicatorViewModel(rmsProvider: rmsProvider)
@@ -34,6 +40,7 @@ final class IndicatorController {
 
         positionOnScreen(panel: panel)
         panel.orderFrontRegardless()
+        installKeepOnTopObserver()
     }
 
     /// Switch to transcribing mode: keep panel visible with waiting animation.
@@ -43,8 +50,33 @@ final class IndicatorController {
     }
 
     func hide() {
+        removeKeepOnTopObserver()
         panel?.orderOut(nil)
         viewModel.stop()
+    }
+
+    /// Keep the panel above every other window for the whole recording.
+    /// `.statusBar` already floats above normal windows, but activating
+    /// another app (or a late high-level window) can still cover the HUD, so
+    /// we re-assert front on each app activation while the panel is visible.
+    private func installKeepOnTopObserver() {
+        guard activationObserver == nil else { return }
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.panel?.orderFrontRegardless()
+            }
+        }
+    }
+
+    private func removeKeepOnTopObserver() {
+        if let activationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+            self.activationObserver = nil
+        }
     }
 
     // MARK: - Panel construction
