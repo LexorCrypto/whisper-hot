@@ -4,7 +4,7 @@ import SwiftUI
 /// Owns the floating recording indicator panel.
 /// - Reads the current `Preferences.indicatorStyle` each `show()` so the user
 ///   can switch modes in Settings and see the change on the next recording.
-/// - Renders one of three styles (minimal / medium / large); the menu bar
+/// - Renders one of two styles (minimal / medium); the menu bar
 ///   status item also flips its SF Symbol to signal recording state.
 /// - Panel is non-activating, appears on all Spaces, survives Stage Manager
 ///   and Spaces transitions, and never steals focus from the target app.
@@ -17,10 +17,10 @@ final class IndicatorController {
         self.viewModel = IndicatorViewModel(rmsProvider: rmsProvider)
     }
 
-    func show() {
+    func show(destination: String? = nil) {
         let style = Preferences.indicatorStyle
 
-        viewModel.start()
+        viewModel.start(destination: destination)
 
         let panel: NSPanel = self.panel ?? makePanel()
         self.panel = panel
@@ -84,8 +84,6 @@ final class IndicatorController {
             root = AnyView(MinimalIndicatorView(viewModel: viewModel))
         case .medium:
             root = AnyView(MediumIndicatorView(viewModel: viewModel))
-        case .large:
-            root = AnyView(LargeIndicatorView(viewModel: viewModel))
         }
         let host = NSHostingView(rootView: root)
         host.translatesAutoresizingMaskIntoConstraints = true

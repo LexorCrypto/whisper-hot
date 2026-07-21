@@ -345,9 +345,13 @@ enum L10n {
         switch s {
         case .minimal: return lang == .ru ? "Минимальный" : "Minimal"
         case .medium: return lang == .ru ? "Средний" : "Medium"
-        case .large: return lang == .ru ? "Большой" : "Large"
         }
     }
+
+    /// Compact destination label shown in the recording indicator when the
+    /// transcript will only reach the clipboard (auto-paste off, or no valid
+    /// target app captured at record start).
+    static var indicatorClipboardTarget: String { lang == .ru ? "Буфер обмена" : "Clipboard" }
 
     // MARK: - Audio retention policies
     static func audioRetentionName(_ r: AudioRetention) -> String {

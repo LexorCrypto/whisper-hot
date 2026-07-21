@@ -92,12 +92,10 @@ Sources/WhisperHot/
 │   └── MainWindowController.swift  Dock window shell: Dashboard, settings sections, History, Setup
 │
 ├── Indicator/
-│   ├── IndicatorController.swift   NSPanel owner; читает Preferences
-│   ├── IndicatorViewModel.swift    20 Hz RMS + elapsed publisher
-│   ├── MiniPillView.swift          Capsule с pulse dot
-│   ├── ClassicWaveformView.swift   Canvas bar renderer
-│   ├── FloatingCapsuleView.swift   Premium: blur material + TimelineView waveform
-│   └── StudioPanelView.swift       Studio: wide dark panel + dense RMS waveform + hotkey footer
+│   ├── IndicatorController.swift   NSPanel owner; читает Preferences, мапит 2 стиля
+│   ├── IndicatorViewModel.swift    20 Hz RMS + elapsed + destination publisher
+│   ├── MinimalIndicatorView.swift  Компактная капсула: dot + 5-bar wave + timer + "→ цель"
+│   └── MediumIndicatorView.swift   Средняя панель: dot + 20-bar RMS wave + timer + "→ цель"
 │
 ├── LocalSetup/
 │   ├── WhisperInstaller.swift    One-click brew install + model download

@@ -1,19 +1,19 @@
 import SwiftUI
 
 /// Mid-size dark "glass" recording panel: a pulsing status dot, a compact
-/// 24-bar accent→violet gradient waveform driven by microphone RMS, and an
-/// mm:ss elapsed timer — all inside a frosted, dark rounded-rect capsule.
+/// accent→violet gradient waveform driven by microphone RMS, an mm:ss
+/// elapsed timer, and the paste destination ("→ App") — all inside a
+/// frosted, dark rounded-rect capsule.
 ///
-///  ┌────────────────────────────────────────────┐
-///  │  ●   ▁▂▄▆█▇▅▃▂▁▂▃▅▇█▆▄▂▁▂▃▅▇   00:05        │
-///  └────────────────────────────────────────────┘
+///  ┌──────────────────────────────────────────────┐
+///  │  ●  ▁▂▄▆█▇▅▃▂▁▂▃▅▇█▆  00:05  → Hermes         │
+///  └──────────────────────────────────────────────┘
 struct MediumIndicatorView: View {
     @ObservedObject var viewModel: IndicatorViewModel
 
-    private let barCount = 24
-    private let panelWidth: CGFloat = 248
+    private let barCount = 20
     private let panelHeight: CGFloat = 46
-    private let waveWidth: CGFloat = 146
+    private let waveWidth: CGFloat = 104
     private let waveHeight: CGFloat = 26
 
     private let accent = Color(red: 0.039, green: 0.518, blue: 1.0)
@@ -40,11 +40,23 @@ struct MediumIndicatorView: View {
             Text(formattedElapsed)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundColor(.white.opacity(0.85))
-                .frame(width: 44, alignment: .trailing)
+
+            if let destination = viewModel.destination {
+                HStack(spacing: 4) {
+                    Text("→")
+                        .foregroundColor(.white.opacity(0.45))
+                    Text(destination)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .frame(maxWidth: 120, alignment: .leading)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .frame(width: panelWidth, height: panelHeight)
+        .frame(height: panelHeight)
         .background(glassShape.fill(Color.black.opacity(0.55)))
         .background(.ultraThinMaterial, in: glassShape)
         .overlay(glassShape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1))

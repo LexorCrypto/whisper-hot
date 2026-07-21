@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
@@ -807,7 +808,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             state = .recording
             recordMenuItem?.title = L10n.stopRecording
             configureButton(recording: true)
-            indicatorController.show()
+            indicatorController.show(destination: pasteDestinationLabel())
             // Play AFTER the engine is armed so the chime is an honest
             // "recording started" signal. On open-mic/speaker setups the
             // chime may land in the first ~200ms of the WAV; Whisper treats
@@ -838,6 +839,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             recordingTarget = nil
             NSLog("WhisperHot: paste target snapshot → none (WhisperHot is frontmost)")
         }
+    }
+
+    /// Human-readable destination for the recording indicator: the app that
+    /// is expected to receive the transcript via auto-paste, or the clipboard
+    /// otherwise. Mirrors the persistent PasteService guards knowable at
+    /// record start (auto-paste on, a valid target, Accessibility granted);
+    /// the pasteboard is always seeded, and a late focus change or secure
+    /// input field can still downgrade the actual paste to copy-only.
+    private func pasteDestinationLabel() -> String {
+        if Preferences.autoPaste,
+           AXIsProcessTrusted(),
+           let name = recordingTarget?.localizedName,
+           !name.isEmpty {
+            return name
+        }
+        return L10n.indicatorClipboardTarget
     }
 
     private func stopRecordingFromMenu() {

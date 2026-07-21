@@ -1,13 +1,12 @@
 import SwiftUI
 
 /// Most minimal recording indicator style: a compact dark-glass capsule with
-/// a pulsing status dot and a tiny 5-bar gradient waveform that echoes the
-/// 5-bar app logo. No text, no timer — just motion.
+/// a pulsing status dot, a tiny 5-bar gradient waveform that echoes the
+/// 5-bar app logo, a small mm:ss timer, and the paste destination.
 ///
-///  ┌──────────────────┐
-///  │  🔴  ▁▃▅▃▁        │
-///  │   (dark glass)    │
-///  └──────────────────┘
+///  ┌────────────────────────────┐
+///  │  🔴 ▁▃▅▃▁ 00:04 → Hermes    │
+///  └────────────────────────────┘
 struct MinimalIndicatorView: View {
     @ObservedObject var viewModel: IndicatorViewModel
 
@@ -19,20 +18,37 @@ struct MinimalIndicatorView: View {
     private let shape = Capsule(style: .continuous)
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 7) {
             Circle()
                 .fill(dotColor)
-                .frame(width: 8, height: 8)
+                .frame(width: 7, height: 7)
                 .opacity(dotOpacity)
 
             Canvas { context, size in
                 drawBars(context: context, size: size)
             }
-            .frame(width: 60, height: 18)
+            .frame(width: 34, height: 16)
+
+            Text(formattedElapsed)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.85))
+
+            if let destination = viewModel.destination {
+                HStack(spacing: 3) {
+                    Text("→")
+                        .foregroundColor(.white.opacity(0.4))
+                    Text(destination)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .frame(maxWidth: 96, alignment: .leading)
+            }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 11)
         .padding(.vertical, 6)
-        .frame(width: 112, height: 34)
+        .frame(height: 30)
         .background(
             shape.fill(Color.black.opacity(0.55))
         )
@@ -91,5 +107,12 @@ struct MinimalIndicatorView: View {
                 )
             )
         }
+    }
+
+    // MARK: - Helpers
+
+    private var formattedElapsed: String {
+        let total = Int(viewModel.elapsed)
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 }

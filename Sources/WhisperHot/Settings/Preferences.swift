@@ -451,7 +451,6 @@ enum AudioRetention: String, CaseIterable, Identifiable, Sendable {
 enum IndicatorStyle: String, CaseIterable, Identifiable {
     case minimal
     case medium
-    case large
 
     var id: String { rawValue }
 }

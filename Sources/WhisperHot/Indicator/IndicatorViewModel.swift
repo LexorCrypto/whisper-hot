@@ -13,6 +13,11 @@ final class IndicatorViewModel: ObservableObject {
     @Published private(set) var isActive: Bool = false
     @Published private(set) var mode: Mode = .idle
 
+    /// Where the finished transcript will land — the localized name of the
+    /// app that was frontmost at record start, or a clipboard label when
+    /// auto-paste is off / there is no valid target. Rendered by the views.
+    @Published private(set) var destination: String?
+
     private let rmsProvider: () -> Float
     private var timer: Timer?
     /// Exposed for TimelineView-based indicators that compute phase
@@ -32,13 +37,14 @@ final class IndicatorViewModel: ObservableObject {
         timer?.invalidate()
     }
 
-    func start() {
+    func start(destination: String? = nil) {
         timer?.invalidate()
         startDate = Date()
         rms = 0
         elapsed = 0
         isActive = true
         mode = .recording
+        self.destination = destination
 
         let t = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -68,6 +74,7 @@ final class IndicatorViewModel: ObservableObject {
         mode = .idle
         rms = 0
         elapsed = 0
+        destination = nil
     }
 
     private func tick() {
