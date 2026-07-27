@@ -424,18 +424,31 @@ final class AudioRecorder: NSObject {
             try rebindActiveSessionToCurrentDevice()
             isSwitchingDevice = false
             NSLog("WhisperHot: recording resumed on the current input device (attempt \(attempt + 1))")
+        } catch AudioError.tapDrainTimedOut {
+            // Terminal, never retried. A wedged tap callback does not unwedge,
+            // and every retry would re-enter the bounded drain wait on the main
+            // thread — `deviceSwitchMaxAttempts * tapDrainTimeout` of frozen
+            // menu bar, which is the exact stall the timeout exists to prevent.
+            abandonSwitch(reason: "tap callbacks wedged")
         } catch {
             guard attempt + 1 < Self.deviceSwitchMaxAttempts else {
-                isSwitchingDevice = false
-                NSLog("WhisperHot: input device never settled (\(error.localizedDescription)); abandoning recording")
-                resetAfterWake()
-                onAutoStop?()
+                abandonSwitch(reason: error.localizedDescription)
                 return
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.deviceSwitchRetryDelay) { [weak self] in
                 self?.attemptDeviceSwitch(attempt: attempt + 1, generation: generation)
             }
         }
+    }
+
+    /// Gives up on migrating the take to the new device. Uses the
+    /// non-blocking teardown, never `stopRecording()`.
+    private func abandonSwitch(reason: String) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        isSwitchingDevice = false
+        NSLog("WhisperHot: device switch failed (\(reason)); abandoning recording")
+        resetAfterWake()
+        onAutoStop?()
     }
 
     /// Moves the in-flight recording onto the current default input device
