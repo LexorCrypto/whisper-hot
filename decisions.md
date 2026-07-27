@@ -4,7 +4,7 @@
 >
 > Формат записи: **Контекст → Решение → Обоснование → Последствия → Альтернативы**.
 >
-> Версия приложения на момент ревизии: **0.7.2**.
+> Версия приложения на момент ревизии: **0.9.1**.
 >
 > Автор: Aleksei Supilin. Лицензия: Apache 2.0.
 
@@ -462,7 +462,8 @@ Keychain prompts.
 вариант того же класса, потому что пересобирает движок.
 
 Что **измерено на реальном железе** (`AirPods Pro`, `Микрофон MacBook Pro`,
-`Микрофон (iPhone)`, `/tmp/audiodiag.swift`): `AVAudioEngine` вообще не
+`Микрофон (iPhone)`; разовый CoreAudio-прогон, воспроизводится тестами в
+`AudioDeviceSwitchSmokeTests`): `AVAudioEngine` вообще не
 сидит на физическом устройстве — он поднимает приватный агрегат
 `CADefaultDeviceAggregate-*`, один и тот же `AUAudioUnit` для input и
 output. Поэтому `inputNode.auAudioUnit.deviceID` возвращает id агрегата, а
