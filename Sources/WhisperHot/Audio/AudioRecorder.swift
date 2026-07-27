@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 import os
 
@@ -16,15 +17,19 @@ final class AudioRecorder: NSObject {
         let inputFormat: AVAudioFormat
         let outputURL: URL
 
-        /// Per-session tap-callback synchronization. Created fresh for each
+        /// Tap-callback synchronization. Created fresh for each
         /// `startRecording()` so an abandoned session whose callback
         /// wedged forever (the `resetAfterWake()` motivating case) cannot
-        /// poison the next session's `stopRecording()`.
+        /// poison the next session's `stopRecording()`. A successor created
+        /// by a mid-recording device switch deliberately INHERITS the group:
+        /// it is the same take, and the old tap is already drained by then.
         let tapGroup: DispatchGroup
 
-        /// Per-session serial disk-I/O queue. Same isolation rationale:
-        /// a stuck `audioFile.write` block on a previous queue does not
-        /// block the next session's drain.
+        /// Serial disk-I/O queue. Same isolation rationale: a stuck
+        /// `audioFile.write` block on a previous queue does not block the
+        /// next session's drain. Inherited across a device switch, because
+        /// both sessions write to the same `audioFile` and their writes MUST
+        /// stay ordered on one queue.
         let writerQueue: DispatchQueue
     }
 
@@ -48,7 +53,37 @@ final class AudioRecorder: NSObject {
     /// The recording continues but the audio may be incomplete.
     var onRecordingError: ((String) -> Void)?
 
-    private let engine = AVAudioEngine()
+    /// Rebuilt whenever the system's default input device moves out from under
+    /// it — see `rebindEngineToCurrentInputDeviceIfNeeded()`. A `var`, not a
+    /// `let`, for exactly that reason.
+    private var engine = AVAudioEngine()
+
+    /// The default input device that was current when `engine` was built.
+    /// Main-thread only. `AVAudioEngine` cannot be asked which microphone it
+    /// is on — it runs on a private aggregate device — so this is how we
+    /// detect that the microphone changed under a live engine.
+    private var engineInputDeviceID = AudioRecorder.currentDefaultInputDeviceID()
+
+    /// True while a device switch is in flight (notification seen, engine not
+    /// yet re-bound). Coalesces the burst of configuration-change
+    /// notifications a single Bluetooth connect produces.
+    private var isSwitchingDevice = false
+
+    /// Bumped by every recording-lifecycle transition and by each new switch
+    /// sequence; a queued retry that no longer matches is dropped.
+    private var deviceSwitchGeneration: UInt64 = 0
+
+    /// A Bluetooth input is not usable the instant the notification arrives:
+    /// the device appears, the profile negotiates, and only then does the HAL
+    /// report a non-zero format. Retry on a short cadence instead of giving up
+    /// on the first zero-rate reading.
+    private static let deviceSwitchRetryDelay: TimeInterval = 0.15
+    private static let deviceSwitchMaxAttempts = 10
+
+    /// Upper bound on waiting for in-flight tap callbacks during a device
+    /// switch. Exceeding it means a callback is wedged, and the WAV must not
+    /// then be handed to a second tap.
+    private static let tapDrainTimeout: DispatchTimeInterval = .milliseconds(500)
 
     // OSAllocatedUnfairLock is the canonical macOS fast lock with priority inheritance.
     // Safe for the real-time audio thread: no stalls from priority inversion the way
@@ -57,11 +92,13 @@ final class AudioRecorder: NSObject {
     private let rmsLock = OSAllocatedUnfairLock<Float>(initialState: 0)
 
     // Per-session DispatchGroup / DispatchQueue live on `ActiveSession` —
-    // see the comments on those fields for why they MUST be per-session
-    // and not shared across recordings. Sharing them was the bug
+    // see the comments on those fields for why they MUST NOT be shared
+    // across unrelated recordings. Sharing them was the bug
     // `resetAfterWake()` would otherwise create: a wedged tap callback or
     // stuck writer block from session N would poison session N+1's
-    // `stopRecording()` drain.
+    // `stopRecording()` drain. The one deliberate exception is the successor
+    // session minted by a mid-recording device switch, which is the same take
+    // continuing on a different microphone.
 
     private var configurationObserver: NSObjectProtocol?
 
@@ -92,11 +129,14 @@ final class AudioRecorder: NSObject {
             throw AudioError.microphoneAccessDenied
         }
 
+        invalidatePendingDeviceSwitch()
+        rebindEngineToCurrentInputDeviceIfNeeded()
+
         let url = try Self.makeOutputURL()
         let inputNode = engine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
+        guard Self.isUsableFormat(inputFormat) else {
             try? FileManager.default.removeItem(at: url)
             throw AudioError.invalidInputFormat
         }
@@ -177,6 +217,8 @@ final class AudioRecorder: NSObject {
         guard isRecording else {
             throw AudioError.notRecording
         }
+
+        invalidatePendingDeviceSwitch()
 
         // Teardown ordering:
         // 1. removeTap  — ask AVAudioEngine to stop scheduling new tap callbacks.
@@ -278,7 +320,7 @@ final class AudioRecorder: NSObject {
         }
     }
 
-    // MARK: - Sleep / wake recovery
+    // MARK: - Sleep / wake and device-switch recovery
 
     /// Best-effort, non-blocking reset of any in-flight session. Designed
     /// for the sleep/wake recovery path: after the kernel suspends the
@@ -293,14 +335,21 @@ final class AudioRecorder: NSObject {
     /// engine and the lock-protected slot back to a sane state so the
     /// next `startRecording()` attempt doesn't hit `alreadyRecording`.
     ///
+    /// Also the give-up path of a failed device switch: one of the ways that
+    /// switch fails is a wedged tap callback, and `stopRecording()` would
+    /// then block the menu bar on `tapGroup.wait()` forever. `handleAutoStop`
+    /// discards the take either way, so the clean WAV flush buys nothing here.
+    ///
     /// Safe to call when no session is active (idempotent no-op). Caller
     /// is responsible for treating any orphan WAV as discardable; the
     /// retention sweeper will clean it up.
     func resetAfterWake() {
         dispatchPrecondition(condition: .onQueue(.main))
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        removeConfigurationObserver()
+        invalidatePendingDeviceSwitch()
+        // Rebuild rather than merely stop: after a suspend the engine can come
+        // back bound to a device that no longer exists, and a stale binding
+        // makes every later `startRecording()` fail with `invalidInputFormat`.
+        rebuildEngine()
         let captured: ActiveSession? = sessionLock.withLock { slot in
             let prior = slot
             slot = nil
@@ -316,16 +365,150 @@ final class AudioRecorder: NSObject {
     // MARK: - Configuration observer
 
     private func installConfigurationObserver() {
+        // Idempotent: a device switch that reuses the engine calls this again,
+        // and overwriting the token without unregistering would leak an
+        // observer that keeps handling later notifications.
+        removeConfigurationObserver()
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: engine,
             queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            NSLog("WhisperHot: audio configuration changed; stopping recording")
-            _ = try? self.stopRecording()
-            self.onAutoStop?()
+            self?.handleConfigurationChange()
         }
+    }
+
+    /// `.AVAudioEngineConfigurationChange` fires whenever the HAL topology
+    /// under the engine moves: AirPods connecting or disconnecting, a USB
+    /// interface arriving, the user picking another input in System Settings,
+    /// or the current device renegotiating its sample rate.
+    ///
+    /// This used to tear the take down and report an auto-stop, which made
+    /// AirPods unusable in two compounding ways: putting them on killed the
+    /// recording, and the engine stayed bound to the input device that had
+    /// just disappeared, so every subsequent `startRecording()` failed too —
+    /// the only way out was quitting and relaunching the app. Now we keep the
+    /// take alive: re-point the engine at the current default input and carry
+    /// on writing into the same WAV. Auto-stop is the last resort, once the
+    /// retries are exhausted.
+    private func handleConfigurationChange() {
+        dispatchPrecondition(condition: .onQueue(.main))
+        // Also covers a notification landing while the user presses stop:
+        // no active recording, nothing to migrate (was tech-debt item F027).
+        guard isRecording else { return }
+        // A single Bluetooth connect emits several of these in a row.
+        guard !isSwitchingDevice else { return }
+
+        deviceSwitchGeneration &+= 1
+        isSwitchingDevice = true
+        NSLog("WhisperHot: audio configuration changed; rebinding input device")
+
+        // Detach right away — the old device may already be gone, and we do
+        // not want its half-formed buffers landing in the WAV.
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        attemptDeviceSwitch(attempt: 0, generation: deviceSwitchGeneration)
+    }
+
+    private func attemptDeviceSwitch(attempt: Int, generation: UInt64) {
+        dispatchPrecondition(condition: .onQueue(.main))
+        // A stop / start / reset happened while this retry sat in the queue:
+        // that newer lifecycle event owns the engine now.
+        guard generation == deviceSwitchGeneration else { return }
+        guard isRecording else {
+            isSwitchingDevice = false
+            return
+        }
+
+        do {
+            try rebindActiveSessionToCurrentDevice()
+            isSwitchingDevice = false
+            NSLog("WhisperHot: recording resumed on the current input device (attempt \(attempt + 1))")
+        } catch {
+            guard attempt + 1 < Self.deviceSwitchMaxAttempts else {
+                isSwitchingDevice = false
+                NSLog("WhisperHot: input device never settled (\(error.localizedDescription)); abandoning recording")
+                resetAfterWake()
+                onAutoStop?()
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.deviceSwitchRetryDelay) { [weak self] in
+                self?.attemptDeviceSwitch(attempt: attempt + 1, generation: generation)
+            }
+        }
+    }
+
+    /// Moves the in-flight recording onto the current default input device
+    /// without closing the WAV.
+    ///
+    /// The successor session keeps the same `audioFile`, `outputURL`,
+    /// `writerQueue` and `tapGroup` — it is the same take, so its writes must
+    /// stay ordered behind the previous ones on the one serial queue — and
+    /// takes a new id, input format and converter for the new device.
+    ///
+    /// Everything fallible runs before the live session is touched, so a
+    /// failed attempt leaves the recording exactly as it found it and the
+    /// retry starts from a clean state.
+    private func rebindActiveSessionToCurrentDevice() throws {
+        guard let current = sessionLock.withLock({ $0 }) else {
+            throw AudioError.notRecording
+        }
+
+        rebindEngineToCurrentInputDeviceIfNeeded()
+        let inputNode = engine.inputNode
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        guard Self.isUsableFormat(inputFormat) else {
+            throw AudioError.invalidInputFormat
+        }
+        guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+            throw AudioError.converterUnavailable
+        }
+
+        // Take the old session off the air — in-flight taps bail on the id
+        // check — then let any callback already inside `processTapBuffer`
+        // finish. The engine is stopped and untapped by now, so this returns
+        // immediately unless a callback is genuinely wedged; in that case we
+        // must not hand its AVAudioFile to a second tap.
+        sessionLock.withLock { $0 = nil }
+        guard current.tapGroup.wait(timeout: .now() + Self.tapDrainTimeout) == .success else {
+            sessionLock.withLock { $0 = current }
+            throw AudioError.tapDrainTimedOut
+        }
+
+        sessionCounter &+= 1
+        let successor = ActiveSession(
+            id: sessionCounter,
+            converter: converter,
+            audioFile: current.audioFile,
+            inputFormat: inputFormat,
+            outputURL: current.outputURL,
+            tapGroup: current.tapGroup,
+            writerQueue: current.writerQueue
+        )
+        sessionLock.withLock { $0 = successor }
+
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self, session = successor] buffer, _ in
+            self?.processTapBuffer(buffer, session: session)
+        }
+        installConfigurationObserver()
+
+        do {
+            try engine.start()
+        } catch {
+            // `successor` stays in the slot: it owns the same WAV as `current`,
+            // so the next retry picks the take up from exactly here.
+            inputNode.removeTap(onBus: 0)
+            removeConfigurationObserver()
+            throw AudioError.engineStartFailed(underlying: error)
+        }
+    }
+
+    /// Cancels any queued device-switch retry. Every recording-lifecycle
+    /// transition calls this, so a retry scheduled for a finished take can
+    /// never reach into its successor.
+    private func invalidatePendingDeviceSwitch() {
+        deviceSwitchGeneration &+= 1
+        isSwitchingDevice = false
     }
 
     private func removeConfigurationObserver() {
@@ -333,6 +516,75 @@ final class AudioRecorder: NSObject {
             NotificationCenter.default.removeObserver(obs)
             configurationObserver = nil
         }
+    }
+
+    // MARK: - Input device binding
+
+    /// Rebuilds `engine` when the system's default input device has moved
+    /// since the engine was built, or when the engine stopped reporting a
+    /// usable input format.
+    ///
+    /// Note what we do NOT do here: ask the engine which device it is on.
+    /// `AVAudioEngine` does not sit on a physical device at all — on macOS it
+    /// drives a private `CADefaultDeviceAggregate-*` that wraps the current
+    /// default input and output, so `inputNode.auAudioUnit.deviceID` returns
+    /// the aggregate's id, never the microphone's. Pinning the unit with
+    /// `setDeviceID(_:)` is not an option either: on an engine that has
+    /// already materialised its IO unit it fails with `-10851` and leaves the
+    /// unit with a device id of 0. So we remember the default input device we
+    /// built the engine for and compare against that.
+    ///
+    /// A fresh engine is the reliable recovery: after the HAL topology moves
+    /// under a live engine — AirPods connecting mid-session — its input node
+    /// can keep reporting the format of a device that is gone, and every
+    /// later `startRecording()` fails on `invalidInputFormat` until the app
+    /// is relaunched.
+    private func rebindEngineToCurrentInputDeviceIfNeeded() {
+        let systemDefault = Self.currentDefaultInputDeviceID()
+        let staleFormat = !Self.isUsableFormat(engine.inputNode.outputFormat(forBus: 0))
+        guard systemDefault != engineInputDeviceID || staleFormat else { return }
+        NSLog("WhisperHot: rebuilding audio engine (input device \(engineInputDeviceID) -> \(systemDefault), staleFormat=\(staleFormat))")
+        rebuildEngine()
+    }
+
+    /// Tears the current engine down and replaces it with a fresh instance,
+    /// which resolves the default input device anew. Never waits on the tap or
+    /// writer queues, so it is also safe on the wake-recovery path.
+    private func rebuildEngine() {
+        removeConfigurationObserver()
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        engine = AVAudioEngine()
+        engineInputDeviceID = Self.currentDefaultInputDeviceID()
+    }
+
+    private static func isUsableFormat(_ format: AVAudioFormat) -> Bool {
+        format.sampleRate > 0 && format.channelCount > 0
+    }
+
+    /// The HAL device id macOS currently routes audio input to, or
+    /// `kAudioObjectUnknown` when there is no input device at all.
+    private static func currentDefaultInputDeviceID() -> AudioDeviceID {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var deviceID = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &size,
+            &deviceID
+        )
+        guard status == noErr else {
+            NSLog("WhisperHot: could not read the default input device (OSStatus \(status))")
+            return AudioDeviceID(kAudioObjectUnknown)
+        }
+        return deviceID
     }
 
     // MARK: - Helpers

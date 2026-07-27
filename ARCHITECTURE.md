@@ -155,6 +155,20 @@ AudioRecorder.startRecording
    ▼
 Пользователь говорит. IndicatorViewModel поллит currentRMS на 20 Hz.
    │
+   │  Если во время записи меняется аудиоустройство (AirPods, USB-микрофон,
+   │  смена входа в System Settings) — прилетает
+   │  .AVAudioEngineConfigurationChange:
+   │    AudioRecorder.handleConfigurationChange
+   │      │  removeTap; engine.stop
+   │      ▼
+   │    rebindActiveSessionToCurrentDevice (до 10 попыток × 150 мс)
+   │      │  пересобирает AVAudioEngine, если сменился default input device
+   │      │  новый converter + inputFormat, новый session.id
+   │      │  наследует audioFile / outputURL / writerQueue / tapGroup
+   │      ▼
+   │    запись продолжается в тот же WAV (ADR-019)
+   │    не поднялось за все попытки → resetAfterWake + onAutoStop
+   │
    ▼
 Пользователь жмёт ⌥⌘5 снова
    │

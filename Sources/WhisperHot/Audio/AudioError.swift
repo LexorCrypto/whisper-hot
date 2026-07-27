@@ -7,6 +7,7 @@ enum AudioError: LocalizedError {
     case invalidInputFormat
     case converterUnavailable
     case engineStartFailed(underlying: Error)
+    case tapDrainTimedOut
 
     var errorDescription: String? {
         switch self {
@@ -22,6 +23,8 @@ enum AudioError: LocalizedError {
             return "Could not create audio converter for the current input format."
         case .engineStartFailed(let err):
             return "Audio engine failed to start: \(err.localizedDescription)"
+        case .tapDrainTimedOut:
+            return "Audio input callbacks did not finish in time while switching devices."
         }
     }
 }

@@ -53,9 +53,9 @@ swift build -c release      # компиляция
 - `Sources/WhisperHot/LocalSetup/` — WhisperInstaller + UpdateChecker
 - `Sources/WhisperHot/Concurrency/` — DataBuffer (NSLock-guarded byte accumulator для subprocess pipe drain)
 - `Sources/WhisperHot/Networking/` — Endpoints (single source URLs) + HTTPClient (ephemeral URLSession с bounded `timeoutIntervalForResource = 180s`, ADR-015)
-- `Sources/WhisperHot/Audio/AudioRecorder.swift` — AVAudioEngine wrapper; `ActiveSession` владеет per-session `tapGroup` / `writerQueue` / `id`, чтобы wedged callback из abandoned session не отравлял следующий `stopRecording()` (ADR-015). Метод `resetAfterWake()` — non-blocking teardown для wake-recovery path.
+- `Sources/WhisperHot/Audio/AudioRecorder.swift` — AVAudioEngine wrapper; `ActiveSession` владеет per-session `tapGroup` / `writerQueue` / `id`, чтобы wedged callback из abandoned session не отравлял следующий `stopRecording()` (ADR-015). Метод `resetAfterWake()` — non-blocking teardown для wake-recovery и give-up-пути device switch. Смена аудиоустройства во время записи мигрирует сессию на новый микрофон (successor наследует `audioFile`/`writerQueue`/`tapGroup`), а не останавливает запись; движок пересобирается при смене default input device (ADR-019).
 - `Sources/WhisperHot/Transcription/FallbackTranscriptionService.swift` — offline fallback wrapper, опциональный timeout race (ADR-014)
-- `Tests/WhisperHotTests/` — 5 файлов / 54 теста: Keychain, HistoryStore (encryption), WordReplacement, ContextRouter, FallbackTranscriptionService
+- `Tests/WhisperHotTests/` — 6 файлов / 56 тестов: Keychain, HistoryStore (encryption), WordReplacement, ContextRouter, FallbackTranscriptionService, AudioDeviceSwitch (read-only платформенные предпосылки)
 - `Resources/Sounds/` — кастомные AIFF звуки
 - `Resources/WhisperHot.icns` — иконка приложения (Voice → Text logo)
 - `docs/logo-concepts/` — design exploration: 6 концептов + showcase HTML
