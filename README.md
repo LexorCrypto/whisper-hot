@@ -6,7 +6,7 @@
 приложение, где ты сейчас печатаешь. Жмёшь `⌥⌘5`, говоришь, снова жмёшь
 `⌥⌘5`, транскрипт оказывается у курсора.
 
-Статус: **0.9.1** — personal build. Подписан сертификатом Developer ID
+Статус: **0.9.2** — personal build. Подписан сертификатом Developer ID
 Application (Aleksei Supilin) и **нотаризован Apple**,
 собран одним разработчиком. Главное окно с Dashboard / History /
 Settings / Setup, быстрый menu bar controller, два стиля индикатора
