@@ -82,6 +82,10 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
         )
     }
 
+    /// Returns `kAudioObjectUnknown` when the query fails, so a machine that
+    /// cannot answer it **skips** rather than fails. Asserting `noErr` here
+    /// would run before the caller's `XCTSkipIf` and turn "no audio hardware"
+    /// into a red test.
     private static func defaultInputDeviceID() -> AudioDeviceID {
         var address = globalAddress(kAudioHardwarePropertyDefaultInputDevice)
         var deviceID = AudioDeviceID(kAudioObjectUnknown)
@@ -89,7 +93,10 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
         let status = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
         )
-        XCTAssertEqual(status, noErr, "read default input device")
+        guard status == noErr else {
+            print("SMOKE could not read default input device (OSStatus \(status))")
+            return AudioDeviceID(kAudioObjectUnknown)
+        }
         return deviceID
     }
 

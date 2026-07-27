@@ -1,9 +1,12 @@
 # Архитектура
 
 WhisperHot (до 0.3.0 — WhisperLocal) — Swift 5.9 / SwiftPM macOS
-приложение. 48 Swift файлов, ~8940 строк (после v0.7.2: добавлены
+приложение. Компактная кодовая база (несколько десятков Swift-файлов,
+порядка 9 тыс. строк; точное число дрейфует почти с каждым коммитом —
+пересчитывайте `find Sources/WhisperHot -name '*.swift' | xargs wc -l`,
+не полагайтесь на цифру в этом файле буквально). После v0.7.2 добавлены
 sleep/wake recovery, per-session audio primitives, ephemeral
-URLSession, полноценное главное окно и защита от Keychain prompt-loop).
+URLSession, полноценное главное окно и защита от Keychain prompt-loop.
 Три SwiftPM target:
 `WhisperHotLib` (library), `WhisperHot` (thin executable),
 `WhisperHotTests` (unit tests с @testable import). AppKit — основная оболочка,
@@ -161,13 +164,32 @@ AudioRecorder.startRecording
    │    AudioRecorder.handleConfigurationChange
    │      │  removeTap; engine.stop
    │      ▼
-   │    rebindActiveSessionToCurrentDevice (до 10 попыток × 150 мс)
-   │      │  пересобирает AVAudioEngine, если сменился default input device
-   │      │  новый converter + inputFormat, новый session.id
-   │      │  наследует audioFile / outputURL / writerQueue / tapGroup
+   │    attemptDeviceSwitch (attempt 0…9, до 10 попыток)
+   │      │  фаза A: пересобирает AVAudioEngine (если сменился default
+   │      │           input device), новый converter + inputFormat; отказ
+   │      │           здесь не трогает живую сессию — просто следующий ретрай
+   │      │  фаза B: sessionLock очищается, tapGroup.wait(timeout: 500 мс)
+   │      │  фаза C: публикует successor (наследует audioFile / outputURL /
+   │      │           writerQueue / tapGroup), installTap, engine.start()
    │      ▼
-   │    запись продолжается в тот же WAV (ADR-019)
-   │    не поднялось за все попытки → resetAfterWake + onAutoStop
+   │    ├─ успех → запись продолжается в тот же WAV (ADR-019)
+   │    │
+   │    ├─ обычная ошибка (invalidInputFormat / converterUnavailable /
+   │    │  engineStartFailed) и попытки ещё остались → asyncAfter(150 мс),
+   │    │  следующая попытка (только попытки 1…9 идут через задержку —
+   │    │  суммарно 1.35 с фиксированного backoff, попытка 0 синхронна);
+   │    │  все 10 попыток исчерпаны → abandonSwitch
+   │    │
+   │    └─ AudioError.tapDrainTimedOut (drain фазы B не уложился в 500 мс) —
+   │       терминально, БЕЗ ретрая, сразу abandonSwitch (исходная сессия
+   │       перед throw возвращается в слот)
+   │      ▼
+   │    abandonSwitch → resetAfterWake() → onAutoStop()
+   │      │  resetAfterWake логирует "orphaned WAV" и НЕ удаляет файл;
+   │      │  handleAutoStop возвращает меню в .idle, транскрипция не стартует
+   │      │  WAV остаётся на диске до срабатывания политики AudioRetention
+   │      │  (.forever — никогда автоматически; .untilQuit — при выходе
+   │      │  и на следующем запуске)
    │
    ▼
 Пользователь жмёт ⌥⌘5 снова

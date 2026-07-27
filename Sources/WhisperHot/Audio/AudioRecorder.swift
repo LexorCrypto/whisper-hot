@@ -459,9 +459,17 @@ final class AudioRecorder: NSObject {
     /// stay ordered behind the previous ones on the one serial queue — and
     /// takes a new id, input format and converter for the new device.
     ///
-    /// Everything fallible runs before the live session is touched, so a
-    /// failed attempt leaves the recording exactly as it found it and the
-    /// retry starts from a clean state.
+    /// Three phases, and the live session is touched BEFORE the last fallible
+    /// step — do not shorten this to "everything fallible runs first", which
+    /// is what an earlier version of this comment claimed and an audit caught.
+    /// **A:** rebuild the engine, read the format, build the converter — a
+    /// failure here leaves the live session untouched. **B:** clear the slot,
+    /// then drain the old `tapGroup` under `tapDrainTimeout`; on timeout the
+    /// original session is put back. **C:** publish the successor, install the
+    /// tap, start the engine; if the start fails the successor deliberately
+    /// stays in the slot, because it owns the same WAV and the retry resumes
+    /// the same take from there. No retry path loses the take, and one
+    /// `AVAudioFile` is never handed to two writers at once.
     private func rebindActiveSessionToCurrentDevice() throws {
         guard let current = sessionLock.withLock({ $0 }) else {
             throw AudioError.notRecording
