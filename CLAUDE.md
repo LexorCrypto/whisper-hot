@@ -30,6 +30,20 @@ close_session.push_policy    = ask           # never auto-push without approval
 close_session.issue_language = ru
 ```
 
+**Ветка `main` — только через pull request** (решение владельца 2026-07-27). Прямой
+push в `main` выводит коммиты из множества `SESSION` гейта покрытия: `merge-base
+HEAD origin/main` совпадает с `HEAD`, `audit_coverage.py` показывает `session 0`, и
+эти коммиты уже никогда не будут покрыты audit-записью. Так произошло с 0.9.1 и
+0.9.2 — четыре раунда аудита пришлось запускать вручную вне гейта. Работа идёт в
+ветке → PR → merge двухродительским merge-коммитом (squash и rebase на платформе
+должны быть выключены, иначе `--pr-head` падает fail-closed).
+
+**Аудит-песочница — своя на проект.** Глобальный `close-session` хардкодит
+`$HOME/.cache/close-session-audit` (`SKILL.md:485`) без неймспейса; два
+одновременных прогона в разных проектах затирают друг другу клон и stdout — это
+уже случилось в этой сессии и обесценило целый раунд. Для этого репозитория
+использовать `$HOME/.cache/close-session-audit-whisper-hot`.
+
 ## Сборка и запуск
 
 ```bash
