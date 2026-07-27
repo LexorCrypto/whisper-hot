@@ -16,7 +16,7 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
     /// This is the recovery `rebindEngineToCurrentInputDeviceIfNeeded()`
     /// performs: throw the engine away, build a new one, read the format.
     func testFreshEngineReportsUsableInputFormat() throws {
-        let systemDefault = Self.defaultInputDeviceID()
+        let systemDefault = try Self.requireDefaultInputDeviceID()
         print("SMOKE input devices: \(Self.inputDevices()); default=\(systemDefault)")
         try XCTSkipIf(
             systemDefault == AudioDeviceID(kAudioObjectUnknown),
@@ -45,7 +45,7 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
     /// device itself instead of asking the engine. If this ever stops holding,
     /// the cheaper `auAudioUnit.deviceID` comparison becomes available.
     func testEngineAudioUnitDoesNotExposeThePhysicalInputDevice() throws {
-        let systemDefault = Self.defaultInputDeviceID()
+        let systemDefault = try Self.requireDefaultInputDeviceID()
         try XCTSkipIf(
             systemDefault == AudioDeviceID(kAudioObjectUnknown),
             "no input device on this machine"
@@ -82,11 +82,28 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
         )
     }
 
-    /// Returns `kAudioObjectUnknown` when the query fails, so a machine that
-    /// cannot answer it **skips** rather than fails. Asserting `noErr` here
-    /// would run before the caller's `XCTSkipIf` and turn "no audio hardware"
-    /// into a red test.
-    private static func defaultInputDeviceID() -> AudioDeviceID {
+    /// A CoreAudio query that failed outright. Distinct from "this machine has
+    /// no microphone", which macOS reports as `noErr` naming
+    /// `kAudioObjectUnknown`.
+    private struct CoreAudioQueryFailure: Error, CustomStringConvertible {
+        let property: String
+        let status: OSStatus
+        var description: String {
+            "CoreAudio rejected \(property) with OSStatus \(status)"
+        }
+    }
+
+    /// The system default input device, or `kAudioObjectUnknown` when this
+    /// machine genuinely has none — the single outcome the callers may skip on.
+    ///
+    /// A failing `AudioObjectGetPropertyData` is **not** that outcome and
+    /// throws instead. `kAudioObjectSystemObject` is always a valid object
+    /// (`AudioHardwareBase.h:136-137`), so every nonzero `OSStatus` here means
+    /// the platform assumption these tests exist to pin down has broken.
+    /// Folding them all into the sentinel — as this helper briefly did — made a
+    /// CoreAudio regression indistinguishable from a headless machine and would
+    /// have turned both tests into a green skip.
+    private static func requireDefaultInputDeviceID() throws -> AudioDeviceID {
         var address = globalAddress(kAudioHardwarePropertyDefaultInputDevice)
         var deviceID = AudioDeviceID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
@@ -94,8 +111,10 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
             AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
         )
         guard status == noErr else {
-            print("SMOKE could not read default input device (OSStatus \(status))")
-            return AudioDeviceID(kAudioObjectUnknown)
+            throw CoreAudioQueryFailure(
+                property: "kAudioHardwarePropertyDefaultInputDevice",
+                status: status
+            )
         }
         return deviceID
     }
