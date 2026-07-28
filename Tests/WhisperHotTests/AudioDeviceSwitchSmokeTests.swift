@@ -97,12 +97,15 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
     /// machine genuinely has none — the single outcome the callers may skip on.
     ///
     /// A failing `AudioObjectGetPropertyData` is **not** that outcome and
-    /// throws instead. `kAudioObjectSystemObject` is always a valid object
-    /// (`AudioHardwareBase.h:136-137`), so every nonzero `OSStatus` here means
-    /// the platform assumption these tests exist to pin down has broken.
-    /// Folding them all into the sentinel — as this helper briefly did — made a
-    /// CoreAudio regression indistinguishable from a headless machine and would
-    /// have turned both tests into a green skip.
+    /// throws instead. `kAudioObjectSystemObject` is the id that "always
+    /// refers to the one and only instance of the AudioSystemObject class"
+    /// (`AudioHardware.h:104-106`), so it can never be the invalid id that
+    /// `kAudioHardwareBadObjectError` reports (`AudioHardwareBase.h:136-137`).
+    /// Every nonzero `OSStatus` here therefore means the platform assumption
+    /// these tests exist to pin down has broken. Folding them all into the
+    /// sentinel — as this helper briefly did — made a CoreAudio regression
+    /// indistinguishable from a headless machine and would have turned both
+    /// tests into a green skip.
     private static func requireDefaultInputDeviceID() throws -> AudioDeviceID {
         var address = globalAddress(kAudioHardwarePropertyDefaultInputDevice)
         var deviceID = AudioDeviceID(kAudioObjectUnknown)
