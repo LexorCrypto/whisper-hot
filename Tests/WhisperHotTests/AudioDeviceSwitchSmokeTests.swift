@@ -16,7 +16,7 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
     /// This is the recovery `rebindEngineToCurrentInputDeviceIfNeeded()`
     /// performs: throw the engine away, build a new one, read the format.
     func testFreshEngineReportsUsableInputFormat() throws {
-        let systemDefault = Self.defaultInputDeviceID()
+        let systemDefault = try Self.requireDefaultInputDeviceID()
         print("SMOKE input devices: \(Self.inputDevices()); default=\(systemDefault)")
         try XCTSkipIf(
             systemDefault == AudioDeviceID(kAudioObjectUnknown),
@@ -45,7 +45,7 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
     /// device itself instead of asking the engine. If this ever stops holding,
     /// the cheaper `auAudioUnit.deviceID` comparison becomes available.
     func testEngineAudioUnitDoesNotExposeThePhysicalInputDevice() throws {
-        let systemDefault = Self.defaultInputDeviceID()
+        let systemDefault = try Self.requireDefaultInputDeviceID()
         try XCTSkipIf(
             systemDefault == AudioDeviceID(kAudioObjectUnknown),
             "no input device on this machine"
@@ -82,14 +82,43 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
         )
     }
 
-    private static func defaultInputDeviceID() -> AudioDeviceID {
+    /// A CoreAudio query that failed outright. Distinct from "this machine has
+    /// no microphone", which macOS reports as `noErr` naming
+    /// `kAudioObjectUnknown`.
+    private struct CoreAudioQueryFailure: Error, CustomStringConvertible {
+        let property: String
+        let status: OSStatus
+        var description: String {
+            "CoreAudio rejected \(property) with OSStatus \(status)"
+        }
+    }
+
+    /// The system default input device, or `kAudioObjectUnknown` when this
+    /// machine genuinely has none — the single outcome the callers may skip on.
+    ///
+    /// A failing `AudioObjectGetPropertyData` is **not** that outcome and
+    /// throws instead. `kAudioObjectSystemObject` is the id that "always
+    /// refers to the one and only instance of the AudioSystemObject class"
+    /// (`AudioHardware.h:104-106`), so it can never be the invalid id that
+    /// `kAudioHardwareBadObjectError` reports (`AudioHardwareBase.h:136-137`).
+    /// Every nonzero `OSStatus` here therefore means the platform assumption
+    /// these tests exist to pin down has broken. Folding them all into the
+    /// sentinel — as this helper briefly did — made a CoreAudio regression
+    /// indistinguishable from a headless machine and would have turned both
+    /// tests into a green skip.
+    private static func requireDefaultInputDeviceID() throws -> AudioDeviceID {
         var address = globalAddress(kAudioHardwarePropertyDefaultInputDevice)
         var deviceID = AudioDeviceID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         let status = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
         )
-        XCTAssertEqual(status, noErr, "read default input device")
+        guard status == noErr else {
+            throw CoreAudioQueryFailure(
+                property: "kAudioHardwarePropertyDefaultInputDevice",
+                status: status
+            )
+        }
         return deviceID
     }
 
