@@ -2,7 +2,7 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
-## [Unreleased]
+## [0.10.0] — 2026-09-15
 
 Локальный one-click STT переведён с `ggml-base` на `ggml-large-v3-turbo-q8_0`.
 
@@ -17,6 +17,7 @@
 - `WhisperInstaller` качает `Endpoints.HuggingFace.whisperModel` (`ggml-large-v3-turbo-q8_0.bin`). Принимает файл только если размер ≥ 700 МБ и SHA-1 = `01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e` (таблица `ggerganov/whisper.cpp`).
 - После появления нового файла удаляется только `models/ggml-base.bin`. `LocalWhisperProvider` argv не менялся.
 - Канон: PRD §3.4, SPEC SR-PERF-010 / §5.5 / §6, ADR-010 ревизия, `L10n.localWhisperInstallHelp`.
+- Версия 0.10.0 (CFBundleVersion 25).
 
 
 ## [0.9.2] — 2026-07-27
