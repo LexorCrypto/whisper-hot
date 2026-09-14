@@ -26,4 +26,8 @@ enum Endpoints {
         static let stt = URL(string: "https://polza.ai/api/v1/audio/transcriptions")!
         static let chat = URL(string: "https://polza.ai/api/v1/chat/completions")!
     }
+
+    enum HuggingFace {
+        static let whisperModel = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin")!
+    }
 }

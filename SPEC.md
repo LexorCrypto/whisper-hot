@@ -5,7 +5,7 @@
 **Статус:** Draft
 **Источник требований:** [`PRD.md`](PRD.md) — «что и зачем» (15 модулей раздела 3, 67 критериев приёмки раздела 6, нефункциональные требования раздела 4)
 **Источник структуры кода:** [`ARCHITECTURE.md`](ARCHITECTURE.md) — карта модулей, data flow, threading model; этот документ **не дублирует** её, а добавляет нормативные контракты поверх описанной там структуры
-**Текущая версия продукта:** 0.9.2 (`VERSION:1`, `Resources/Info.plist:22`, `CHANGELOG.md:5`, `landing/lib/version.ts:1` — все четыре источника версии синхронизированы на момент написания)
+**Текущая версия продукта:** 0.10.0 (`VERSION:1`, `Resources/Info.plist:22`, `CHANGELOG.md:5`, `landing/lib/version.ts:1` — все четыре источника версии синхронизированы на момент написания)
 
 ## Как читать этот документ
 
@@ -107,7 +107,7 @@ graph TD
     KC["macOS Keychain<br/>(6 именованных секретов)"]
     TCC["TCC<br/>Microphone · Accessibility · Input Monitoring"]
     GH["GitHub Releases API<br/>(ручная проверка обновлений)"]
-    HF["HuggingFace<br/>(загрузка ggml-base.bin)"]
+    HF["HuggingFace<br/>(загрузка ggml-large-v3-turbo-q8_0.bin)"]
 
     User -->|"хоткей ⌥⌘5 / ⌥⌘⇧5, меню, Dashboard"| App
     App -->|"NSPasteboard.general + guarded CGEventPost Cmd+V"| Target
@@ -116,11 +116,11 @@ graph TD
     App -->|"Process: -m -f -nt -np"| LocalSTT
     App -->|"Process: stdin prompt"| LocalLLM
     App -->|"Process: brew install whisper-cpp"| Brew
-    App -->|"WAV, history.bin, ggml-base.bin, Preferences"| FS
+    App -->|"WAV, history.bin, ggml-large-v3-turbo-q8_0.bin, Preferences"| FS
     App -->|"SecItemAdd/Copy/Update/Delete"| KC
     App -->|"AVCaptureDevice / AXIsProcessTrusted / IOHIDCheckAccess"| TCC
     App -->|"GET /releases/latest (ручное действие)"| GH
-    App -->|"GET ggml-base.bin (ручное действие)"| HF
+    App -->|"GET ggml-large-v3-turbo-q8_0.bin (ручное действие)"| HF
 ```
 
 Границы контекста:
@@ -212,9 +212,9 @@ graph TD
 
 - **Ответственность.** One-click установка whisper.cpp (Homebrew) + модели (HuggingFace); ручная проверка обновлений через GitHub Releases.
 - **Публичный контракт.** `@MainActor final class WhisperInstaller: ObservableObject { status: Status (5 кейсов), isReady: Bool, install() async, cancel(), findWhisperBinary() -> String? }` (`WhisperInstaller.swift:12-252`); `@MainActor final class UpdateChecker: ObservableObject { status: Status (5 кейсов), check(force:) async, openDownload(), currentVersion: String }` (`UpdateChecker.swift:6-122`).
-- **Инварианты.** `brewPaths`/`whisperPaths` — фиксированные списки из 2/4 путей (ARM64 + Intel fallback, `WhisperInstaller.swift:29-40`); модель валидируется только по HTTP-статусу и минимальному размеру, без криптографической контрольной суммы (SR-PERF-010); `UpdateChecker` кэширует непринудительную проверку на 3600 с.
+- **Инварианты.** `brewPaths`/`whisperPaths` — фиксированные списки из 2/4 путей (ARM64 + Intel fallback, `WhisperInstaller.swift`); модель валидируется HTTP-статусом, размером ≥ 700 МБ и pinned SHA-1 `01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e` (SR-PERF-010); после появления нового файла удаляется только auto-installed `ggml-base.bin` в `modelsDir`; `UpdateChecker` кэширует непринудительную проверку на 3600 с.
 - **Потокобезопасность.** `@MainActor` + `ObservableObject` (прямой SwiftUI bind).
-- **Зависимости.** `Foundation` (`Process`, `URLSession`), `Preferences` (синхронизация путей после установки).
+- **Зависимости.** `Foundation` (`Process`, `URLSession`), `CryptoKit` (SHA-1 скачанной модели), `Preferences` (синхронизация путей после установки).
 
 ### 3.11 UI/Indicator
 
@@ -446,7 +446,7 @@ stateDiagram-v2
 |---|---|
 | Сырой WAV записи | `~/Library/Caches/WhisperHot/recordings/<UUID>.wav` |
 | Зашифрованная история | `~/Library/Application Support/WhisperHot/history.bin` |
-| Автоустановленная модель whisper.cpp | `~/Library/Application Support/WhisperHot/models/ggml-base.bin` (`WhisperInstaller.swift:24-26,44-46,130-131`) |
+| Автоустановленная модель whisper.cpp | `~/Library/Application Support/WhisperHot/models/ggml-large-v3-turbo-q8_0.bin` (`WhisperInstaller.swift`) |
 | Пользовательские модели (local whisper / local LLM) | Путь задаётся пользователем через `NSOpenPanel`; физическое место и жизненный цикл вне контроля WhisperHot |
 
 ### 5.6 Политика ретенции аудио
@@ -477,7 +477,7 @@ stateDiagram-v2
 | OpenRouter PP | `POST https://openrouter.ai/api/v1/chat/completions` | тот же класс + заголовки `HTTP-Referer: https://github.com/LexorCrypto/whisper-hot` (другое значение, чем у OpenRouter STT), `X-Title: WhisperHot` | то же + провайдер-атрибуция | 60с / 180с | то же |
 | Custom HTTPS PP | `POST <customEndpointURL>` | тот же класс, требуется схема `https` | Текст, API-ключ выбранного endpoint'а | 60с / 180с | то же |
 | GitHub Releases API | `GET https://api.github.com/repos/LexorCrypto/whisper-hot/releases/latest` | без тела, заголовок `Accept: application/vnd.github+json` | Ничего из содержимого диктовки; только сам факт запроса версии | 15с | 403/429 → сообщение о rate-limit; 2xx → сравнение semver; иначе HTTP-код/generic-ошибка |
-| HuggingFace | `GET https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin` | без тела | Ничего пользовательского | не задан явно (delegate-based download) | 2xx + размер ≥1 000 000 байт → успех; иначе `.failed` |
+| HuggingFace | `GET https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin` | без тела | Ничего пользовательского | не задан явно (delegate-based download) | 2xx + размер ≥ 700 МБ + SHA-1 `01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e` → успех; иначе `.failed` |
 | Homebrew (`brew install whisper-cpp`) | subprocess, не HTTP напрямую | argv `brew install whisper-cpp` | Полное окружение процесса (`ProcessInfo.processInfo.environment`) передаётся subprocess'у как есть — см. SR-SEC-риск F031 | не задан | ненулевой код выхода → `.failed(message)` |
 
 **Полностью офлайн конфигурации:**
@@ -689,7 +689,7 @@ stateDiagram-v2
 | SR-PERF-007 | Retry-таймер для Fn-монитора **ОБЯЗАН** опрашивать готовность каждые 3с (tolerance 1.0) без верхнего предела попыток, пока тумблер включён. | `MenuBarController.swift:458-484` | §3.12 |
 | SR-PERF-008 | Индикатор **ОБЯЗАН** обновлять RMS/таймер с частотой 20 Гц (`tickInterval=1/20с`, `tolerance=tickInterval/2`). | `IndicatorViewModel.swift:30,56` | §3.9 |
 | SR-PERF-009 | Проверка обновлений через GitHub API **ОГРАНИЧЕНА** таймаутом 15с и кэшируется на 3600с (1 час) для непринудительных вызовов. | `UpdateChecker.swift:35,51` | §3.14, AC-14.5 |
-| SR-PERF-010 | Минимальный размер валидного скачанного файла локальной модели `ggml-base.bin` **ОБЯЗАН** быть не менее 1 000 000 байт; ожидаемый полный размер ~142 MB зафиксирован только в комментарии кода, не как проверяемая контрольная сумма (см. раздел 14). | `WhisperInstaller.swift:267-290` (via `ScoutOps §6`) | §3.4 |
+| SR-PERF-010 | Скачанный файл one-click модели `ggml-large-v3-turbo-q8_0.bin` **ОБЯЗАН** быть не менее 700 000 000 байт и **ОБЯЗАН** совпадать с pinned SHA-1 `01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e` (таблица `ggerganov/whisper.cpp`). Несовпадение **ОБЯЗАНО** отклонять файл до перемещения в `modelsDir`. | `WhisperInstaller.swift`; `Endpoints.swift` (`HuggingFace.whisperModel`) | §3.4 |
 
 ---
 
@@ -802,7 +802,7 @@ stateDiagram-v2
 | Обрезка текста ошибки | Заголовок sticky-баннера PP | 80 символов | `MenuBarController.swift:1030` |
 | Обновления | Таймаут запроса к GitHub API | 15с | `UpdateChecker.swift:51` |
 | Обновления | Кэш непринудительной проверки | 3600с (1 час) | `UpdateChecker.swift:35` |
-| Установка модели | Минимальный валидный размер файла | 1 000 000 байт (~1MB); ожидаемый полный размер ~142MB — только комментарий, не проверка | `WhisperInstaller.swift:267-290` |
+| Установка модели | Минимальный валидный размер + SHA-1 | ≥ 700 000 000 байт; SHA-1 `01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e` | `WhisperInstaller.swift` |
 | Онбординг | Частота опроса разрешений | 2с | `OnboardingWindowController.swift` (via `ScoutUX §4`) |
 | Fn-транспорт | Интервал retry-таймера | 3с (tolerance 1.0) | `MenuBarController.swift:458-484` |
 | Индикатор | Частота обновления UI | 20 Гц (tickInterval=1/20с, tolerance=половина интервала) | `IndicatorViewModel.swift:30,56` |
@@ -861,15 +861,15 @@ WhisperHot обрабатывает потенциально чувствите�
 
 ### 11.1 Источник истины версии
 
-`Resources/Info.plist → CFBundleShortVersionString` — единственный источник истины отображаемой пользователю версии (SR-REL-001, `ARCHITECTURE.md:398-405`). На момент написания все источники синхронизированы на `0.9.2`:
+`Resources/Info.plist → CFBundleShortVersionString` — единственный источник истины отображаемой пользователю версии (SR-REL-001, `ARCHITECTURE.md:398-405`). На момент написания все источники синхронизированы на `0.10.0`:
 
 | Файл | Значение | Роль |
 |---|---|---|
-| `Resources/Info.plist` (`CFBundleShortVersionString`) | `0.9.2` | Источник истины (shipping) |
-| `Resources/Info.plist` (`CFBundleVersion`) | `24` | Build number |
-| `VERSION` | `0.9.2` | Tooling-дубль для скриптов сборки/лендинга |
-| `landing/lib/version.ts` (`BUILD_VERSION`) | `0.9.2` | Build-time fallback для лендинга; runtime `VersionSync` компонент подтягивает актуальную версию с GitHub Releases поверх этого fallback |
-| `CHANGELOG.md` (верхняя секция) | `## [0.9.2] — 2026-07-27` | Публичная история релиза |
+| `Resources/Info.plist` (`CFBundleShortVersionString`) | `0.10.0` | Источник истины (shipping) |
+| `Resources/Info.plist` (`CFBundleVersion`) | `25` | Build number |
+| `VERSION` | `0.10.0` | Tooling-дубль для скриптов сборки/лендинга |
+| `landing/lib/version.ts` (`BUILD_VERSION`) | `0.10.0` | Build-time fallback для лендинга; runtime `VersionSync` компонент подтягивает актуальную версию с GitHub Releases поверх этого fallback |
+| `CHANGELOG.md` (верхняя секция) | `## [0.10.0] — 2026-09-15` | Публичная история релиза |
 
 ### 11.2 `build.sh` — нормативная процедура
 

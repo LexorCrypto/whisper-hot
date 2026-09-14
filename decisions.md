@@ -170,7 +170,7 @@
 
 **Контекст.** Нужна one-click установка whisper.cpp. Варианты: скачать бинарь с GitHub Releases или запустить `brew install`.
 
-**Решение.** Homebrew-backed install. `WhisperInstaller` запускает `brew install whisper-cpp` + скачивает ggml-base.bin с HuggingFace.
+**Решение.** Homebrew-backed install. `WhisperInstaller` запускает `brew install whisper-cpp` + скачивает `ggml-large-v3-turbo-q8_0.bin` (~834 МиБ) с HuggingFace. SHA-1 пинится (`01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e`). После успешной загрузки удаляется только прежний auto-installed `ggml-base.bin` в `~/Library/Application Support/WhisperHot/models/`; пользовательский GGML вне этого каталога не трогается.
 
 **Обоснование (по рекомендации Codex).**
 - GitHub Releases whisper.cpp не имеет стабильных pre-built ARM64 macOS CLI asset'ов.
@@ -180,6 +180,9 @@
 **Последствия.** Homebrew обязателен. Если его нет — показываем инструкцию установки. App Sandbox несовместим с `Process` → `brew` (не используем sandbox).
 
 **Альтернативы.** Прямая загрузка бинаря с GitHub — отвергнута из-за нестабильных asset'ов и supply-chain risk.
+
+**Ревизия 2026-09-14.** Дефолтная one-click модель сменена с `ggml-base.bin` (~142 МиБ) на multilingual `ggml-large-v3-turbo-q8_0.bin`. Тот же Homebrew-контракт (ADR-010); меняется только артефакт и проверка целостности. CLI argv `whisper.cpp -m -f -nt -np` не менялся.
+
 
 ---
 

@@ -2,6 +2,24 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
+## [0.10.0] — 2026-09-15
+
+Локальный one-click STT переведён с `ggml-base` на `ggml-large-v3-turbo-q8_0`.
+
+### Для пользователей
+
+- **Локальная модель по умолчанию — Whisper large-v3-turbo q8 (~834 МБ).** One-click установка качает её с HuggingFace вместо `ggml-base` (~142 МБ). Русский и остальные языки whisper.cpp сохраняются; качество ближе к облачному Groq `whisper-large-v3-turbo`.
+- **Уже установленный `ggml-base.bin` из каталога приложения удаляется** только после успешной загрузки новой модели. Нажмите «Установить» в Settings → Providers. Свой GGML, выбранный вручную вне `~/Library/Application Support/WhisperHot/models/`, не трогается.
+- Загрузка дольше, чем раньше (сотни мегабайт, не ~142 МБ).
+
+### Для разработчиков
+
+- `WhisperInstaller` качает `Endpoints.HuggingFace.whisperModel` (`ggml-large-v3-turbo-q8_0.bin`). Принимает файл только если размер ≥ 700 МБ и SHA-1 = `01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e` (таблица `ggerganov/whisper.cpp`).
+- После появления нового файла удаляется только `models/ggml-base.bin`. `LocalWhisperProvider` argv не менялся.
+- Канон: PRD §3.4, SPEC SR-PERF-010 / §5.5 / §6, ADR-010 ревизия, `L10n.localWhisperInstallHelp`.
+- Версия 0.10.0 (CFBundleVersion 25).
+
+
 ## [0.9.2] — 2026-07-27
 
 Устранено залипание меню-бара до 5 секунд на редком пути отказа при смене
