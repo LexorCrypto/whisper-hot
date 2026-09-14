@@ -57,7 +57,7 @@ Keychain, TCC/Accessibility и macOS paste/hotkey APIs.
 - `⌥⌘⇧5` (с Shift) вставляет сырой текст без LLM-обработки.
 - Технический словарь: подсказки для распознавания (commit, deploy, push)
   и автозамены после транскрипции (коммит→commit, деплой→deploy и т.д.).
-- Установка whisper.cpp одной кнопкой (Homebrew + модель с HuggingFace).
+- Установка whisper.cpp одной кнопкой (Homebrew + модель `ggml-large-v3-turbo-q8_0` ~834 МБ с HuggingFace).
   Если нет интернета, автоматически переключается на локальную
   транскрипцию.
 - Опциональный авто-переключатель на локальный whisper при медленной

@@ -249,8 +249,8 @@ enum L10n {
     }
     static var localWhisperInstallHelp: String {
         lang == .ru
-            ? "Нажмите «Установить» для автоматической установки whisper-cpp через Homebrew и загрузки модели ggml-base (~142 МБ). Установка занимает 2-5 минут. Или настройте пути вручную."
-            : "Click Install to automatically set up whisper-cpp via Homebrew and download the ggml-base model (~142 MB). Installation takes 2-5 minutes. Or configure paths manually."
+            ? "Нажмите «Установить» для автоматической установки whisper-cpp через Homebrew и загрузки модели ggml-large-v3-turbo-q8_0 (~834 МБ). Загрузка занимает несколько минут. Или настройте пути вручную."
+            : "Click Install to automatically set up whisper-cpp via Homebrew and download the ggml-large-v3-turbo-q8_0 model (~834 MB). The download takes several minutes. Or configure paths manually."
     }
     static var homebrewNotFound: String {
         lang == .ru

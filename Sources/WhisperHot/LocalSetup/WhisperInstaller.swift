@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Manages one-click installation of whisper.cpp binary (via Homebrew)
@@ -22,8 +23,8 @@ final class WhisperInstaller: ObservableObject {
     @Published private(set) var status: Status = .notInstalled
 
     private let modelsDir: URL
-    private let defaultModelName = "ggml-base.bin"
-    private let modelURL = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin")!
+    private let defaultModelName = LocalWhisperModelArtifact.fileName
+    private let modelURL = Endpoints.HuggingFace.whisperModel
 
     /// Known Homebrew binary paths (ARM64 + Intel fallback)
     private let brewPaths = [
@@ -51,7 +52,8 @@ final class WhisperInstaller: ObservableObject {
 
     /// Refresh installation status by checking filesystem.
     func refreshStatus() {
-        if let _ = findWhisperBinary(), modelExists() {
+        if findWhisperBinary() != nil, modelExists() {
+            removeRetiredAutoInstalledModel()
             status = .installed
             syncPreferences()
         } else {
@@ -98,8 +100,8 @@ final class WhisperInstaller: ObservableObject {
             }
         }
 
-        // Step 3: Verify and sync
-        if let _ = findWhisperBinary(), modelExists() {
+        if findWhisperBinary() != nil, modelExists() {
+            removeRetiredAutoInstalledModel()
             syncPreferences()
             status = .installed
         } else {
@@ -132,7 +134,18 @@ final class WhisperInstaller: ObservableObject {
     }
 
     private func modelExists() -> Bool {
-        FileManager.default.fileExists(atPath: modelPath().path)
+        let path = modelPath().path
+        guard FileManager.default.fileExists(atPath: path) else { return false }
+        let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+        return size >= LocalWhisperModelArtifact.minimumBytes
+    }
+
+    /// Deletes the previous one-click model only after the current default is on disk.
+    /// Custom paths outside `modelsDir` are left alone.
+    private func removeRetiredAutoInstalledModel() {
+        let retired = modelsDir.appendingPathComponent(LocalWhisperModelArtifact.retiredFileName)
+        guard FileManager.default.fileExists(atPath: retired.path) else { return }
+        try? FileManager.default.removeItem(at: retired)
     }
 
     // MARK: - Homebrew install
@@ -273,12 +286,27 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
             return
         }
 
-        // Validate file size (ggml-base.bin should be ~142MB, reject < 1MB)
+        // Reject HTML error pages and truncated payloads before the SHA-1 pin.
         let attrs = try? FileManager.default.attributesOfItem(atPath: location.path)
         let size = (attrs?[.size] as? Int64) ?? 0
-        if size < 1_000_000 {
+        if size < LocalWhisperModelArtifact.minimumBytes {
             onComplete(NSError(domain: "WhisperInstaller", code: -1,
                                userInfo: [NSLocalizedDescriptionKey: "Downloaded file too small (\(size) bytes), likely corrupt"]))
+            return
+        }
+
+        do {
+            let digest = try LocalWhisperModelArtifact.sha1Hex(of: location)
+            if digest.caseInsensitiveCompare(LocalWhisperModelArtifact.sha1Hex) != .orderedSame {
+                onComplete(NSError(
+                    domain: "WhisperInstaller",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "Model checksum mismatch (got \(digest))"]
+                ))
+                return
+            }
+        } catch {
+            onComplete(error)
             return
         }
 
@@ -305,5 +333,24 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
             // The caller checks for cancel and sets .notInstalled instead of .failed.
             onComplete(error)
         }
+    }
+}
+
+/// Pinned one-click whisper.cpp artifact. SHA-1 matches ggerganov/whisper.cpp model table.
+private enum LocalWhisperModelArtifact {
+    static let fileName = "ggml-large-v3-turbo-q8_0.bin"
+    static let retiredFileName = "ggml-base.bin"
+    /// Floor under the advertised 834 MiB; HTML error pages fail this before SHA-1.
+    static let minimumBytes: Int64 = 700_000_000
+    static let sha1Hex = "01bf15bedffe9f39d65c1b6ff9b687ea91f59e0e"
+
+    static func sha1Hex(of url: URL) throws -> String {
+        var hasher = Insecure.SHA1()
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        while let chunk = try handle.read(upToCount: 1_048_576), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 }
