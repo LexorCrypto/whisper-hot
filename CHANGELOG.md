@@ -2,7 +2,7 @@
 
 Все значимые изменения в WhisperHot (до 0.3.0 — WhisperLocal).
 
-## [Unreleased]
+## [0.10.1] — 2026-09-16
 
 Диктовка снова стартует во время повтора экрана на телевизор.
 
@@ -14,6 +14,7 @@
 
 - `startRecording()` и миграция по `.AVAudioEngineConfigurationChange` всегда делают `rebuildEngine()`. Сверка одного `engineInputDeviceID` снята — она пропускала смену default output.
 - ADR-019 ревизия; SR-AUD-004.
+- Версия 0.10.1 (CFBundleVersion 26).
 
 
 ## [0.10.0] — 2026-09-15

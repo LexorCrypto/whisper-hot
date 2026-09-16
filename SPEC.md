@@ -5,7 +5,7 @@
 **Статус:** Draft
 **Источник требований:** [`PRD.md`](PRD.md) — «что и зачем» (15 модулей раздела 3, 67 критериев приёмки раздела 6, нефункциональные требования раздела 4)
 **Источник структуры кода:** [`ARCHITECTURE.md`](ARCHITECTURE.md) — карта модулей, data flow, threading model; этот документ **не дублирует** её, а добавляет нормативные контракты поверх описанной там структуры
-**Текущая версия продукта:** 0.10.0 (`VERSION:1`, `Resources/Info.plist:22`, `CHANGELOG.md:5`, `landing/lib/version.ts:1` — все четыре источника версии синхронизированы на момент написания)
+**Текущая версия продукта:** 0.10.1 (`VERSION:1`, `Resources/Info.plist:22`, `CHANGELOG.md:5`, `landing/lib/version.ts:1` — все четыре источника версии синхронизированы на момент написания)
 
 ## Как читать этот документ
 
@@ -861,15 +861,15 @@ WhisperHot обрабатывает потенциально чувствите�
 
 ### 11.1 Источник истины версии
 
-`Resources/Info.plist → CFBundleShortVersionString` — единственный источник истины отображаемой пользователю версии (SR-REL-001, `ARCHITECTURE.md:398-405`). На момент написания все источники синхронизированы на `0.10.0`:
+`Resources/Info.plist → CFBundleShortVersionString` — единственный источник истины отображаемой пользователю версии (SR-REL-001, `ARCHITECTURE.md:398-405`). На момент написания все источники синхронизированы на `0.10.1`:
 
 | Файл | Значение | Роль |
 |---|---|---|
-| `Resources/Info.plist` (`CFBundleShortVersionString`) | `0.10.0` | Источник истины (shipping) |
-| `Resources/Info.plist` (`CFBundleVersion`) | `25` | Build number |
-| `VERSION` | `0.10.0` | Tooling-дубль для скриптов сборки/лендинга |
-| `landing/lib/version.ts` (`BUILD_VERSION`) | `0.10.0` | Build-time fallback для лендинга; runtime `VersionSync` компонент подтягивает актуальную версию с GitHub Releases поверх этого fallback |
-| `CHANGELOG.md` (верхняя секция) | `## [0.10.0] — 2026-09-15` | Публичная история релиза |
+| `Resources/Info.plist` (`CFBundleShortVersionString`) | `0.10.1` | Источник истины (shipping) |
+| `Resources/Info.plist` (`CFBundleVersion`) | `26` | Build number |
+| `VERSION` | `0.10.1` | Tooling-дубль для скриптов сборки/лендинга |
+| `landing/lib/version.ts` (`BUILD_VERSION`) | `0.10.1` | Build-time fallback для лендинга; runtime `VersionSync` компонент подтягивает актуальную версию с GitHub Releases поверх этого fallback |
+| `CHANGELOG.md` (верхняя секция) | `## [0.10.1] — 2026-09-16` | Публичная история релиза |
 
 ### 11.2 `build.sh` — нормативная процедура
 
