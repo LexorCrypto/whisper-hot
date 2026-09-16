@@ -13,8 +13,8 @@ import XCTest
 final class AudioDeviceSwitchSmokeTests: XCTestCase {
 
     /// A freshly built engine must be usable on whatever microphone is current.
-    /// This is the recovery `rebindEngineToCurrentInputDeviceIfNeeded()`
-    /// performs: throw the engine away, build a new one, read the format.
+    /// This is the recovery `rebuildEngine()` performs: throw the engine away,
+    /// build a new one, read the format.
     func testFreshEngineReportsUsableInputFormat() throws {
         let systemDefault = try Self.requireDefaultInputDeviceID()
         print("SMOKE input devices: \(Self.inputDevices()); default=\(systemDefault)")
@@ -59,7 +59,7 @@ final class AudioDeviceSwitchSmokeTests: XCTestCase {
         XCTAssertNotEqual(
             unitDeviceID,
             systemDefault,
-            "engine reports the physical input device now — revisit rebindEngineToCurrentInputDeviceIfNeeded()"
+            "engine reports the physical input device now — revisit rebuildEngine()"
         )
     }
 
