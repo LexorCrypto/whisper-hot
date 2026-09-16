@@ -5,7 +5,7 @@
 **Статус:** Draft
 **Источник требований:** [`PRD.md`](PRD.md) — «что и зачем» (15 модулей раздела 3, 67 критериев приёмки раздела 6, нефункциональные требования раздела 4)
 **Источник структуры кода:** [`ARCHITECTURE.md`](ARCHITECTURE.md) — карта модулей, data flow, threading model; этот документ **не дублирует** её, а добавляет нормативные контракты поверх описанной там структуры
-**Текущая версия продукта:** 0.10.0 (`VERSION:1`, `Resources/Info.plist:22`, `CHANGELOG.md:5`, `landing/lib/version.ts:1` — все четыре источника версии синхронизированы на момент написания)
+**Текущая версия продукта:** 0.10.1 (`VERSION:1`, `Resources/Info.plist:22`, `CHANGELOG.md:5`, `landing/lib/version.ts:1` — все четыре источника версии синхронизированы на момент написания)
 
 ## Как читать этот документ
 
@@ -503,8 +503,8 @@ stateDiagram-v2
 | SR-AUD-001 | `AudioRecorder` **ОБЯЗАН** записывать аудио в формате WAV: linear PCM, 16 000 Гц, mono, 16-бит signed integer, interleaved. | `AudioRecorder.swift:105-112,151-164` | §3.1 |
 | SR-AUD-002 | `startRecording()`, дойдя до этой точки (после guard'а `!isRecording`), **ОБЯЗАН** бросать `AudioError.microphoneAccessDenied`, если `AVCaptureDevice.authorizationStatus(for: .audio) != .authorized`, и **НЕ ДОЛЖЕН** создавать WAV-файл в этом случае. | `AudioRecorder.swift:122-130` | §3.1, AC-1.4 |
 | SR-AUD-003 | `startRecording()` **ОБЯЗАН** бросать `AudioError.alreadyRecording`, если `isRecording` уже `true`, не трогая существующую сессию. | `AudioRecorder.swift:125-127` | §3.1 |
-| SR-AUD-004 | Перед каждым `startRecording()`, дошедшим до этой точки (после guard'ов `!isRecording` и разрешения микрофона), приложение **ОБЯЗАНО** сверить системное устройство ввода по умолчанию с идентификатором, запомненным при последней сборке `AVAudioEngine` (`engineInputDeviceID`), и пересобрать движок, если он изменился либо текущий формат непригоден. | `AudioRecorder.swift:132-133,563-569`; ADR-019 | §3.2, AC-2.4 |
-| SR-AUD-005 | Приложение **НЕ ДОЛЖНО** определять физическое устройство ввода опросом `inputNode.auAudioUnit.deviceID` (движок сидит на приватном `CADefaultDeviceAggregate-*`) или вызовом `setDeviceID(_:)` на материализованном юните (падает с `-10851`). | `AudioRecorder.swift:548-556`; `decisions.md:464-473` (ADR-019) | §3.2 |
+| SR-AUD-004 | Перед каждым `startRecording()`, дошедшим до этой точки (после guard'ов `!isRecording` и разрешения микрофона), приложение **ОБЯЗАНО** пересобрать `AVAudioEngine` (`rebuildEngine()`), а не сверять только default input device id. Агрегат HAL включает и выход: повтор экрана / AirPlay меняет output, не трогая микрофон. | `AudioRecorder.swift` (`startRecording`, `rebuildEngine`); ADR-019 | §3.2, AC-2.4 |
+| SR-AUD-005 | Приложение **НЕ ДОЛЖНО** определять физическое устройство ввода опросом `inputNode.auAudioUnit.deviceID` (движок сидит на приватном `CADefaultDeviceAggregate-*`) или вызовом `setDeviceID(_:)` на материализованном юните (падает с `-10851`). | `AudioRecorder.swift` (`rebuildEngine`); `decisions.md` (ADR-019) | §3.2 |
 | SR-AUD-006 | Смена аудиоконфигурации (`.AVAudioEngineConfigurationChange`) во время активной записи **НЕ ДОЛЖНА** завершать запись немедленно — обработчик **ОБЯЗАН** запустить миграцию сессии вместо остановки. | `AudioRecorder.swift:394-411`; `decisions.md:477-481` (ADR-019) | §3.2, AC-2.1 |
 | SR-AUD-007 | Successor-сессия при миграции **ОБЯЗАНА** наследовать `audioFile`, `outputURL`, `writerQueue` и `tapGroup` исходной сессии, получая только новый `id`, `converter` и `inputFormat`. | `AudioRecorder.swift:499-508`; `decisions.md:477-481` (ADR-019) | §3.2, AC-2.1 |
 | SR-AUD-008 | Миграция **ОБЯЗАНА** идти тремя фазами. **A:** пересборка движка, получение формата и создание конвертера выполняются, пока живая сессия не тронута; отказ здесь **ОБЯЗАН** оставить её нетронутой. **B:** `sessionLock` очищается, затем выполняется ограниченный дренаж старого `tapGroup`; при таймауте исходная сессия **ОБЯЗАНА** быть возвращена в слот. **C:** публикация successor, установка tap, `engine.start()`; при отказе старта в слоте **ОБЯЗАН** остаться successor, владеющий тем же `audioFile`/`outputURL`/`writerQueue`/`tapGroup`. Ни на одном ретрай-пути дубль **НЕ ДОЛЖЕН** теряться, и один `AVAudioFile` **НЕ ДОЛЖЕН** одновременно принадлежать двум писателям. На терминальный выход (SR-AUD-012, SR-AUD-019) требование не распространяется — он дубль осознанно выбрасывает. | `AudioRecorder.swift:462-525` (фаза B — `493-497`) | §3.2 |
@@ -702,7 +702,7 @@ stateDiagram-v2
 | `alreadyRecording` | Повторный `startRecording()` при активной сессии | Не показывается — состояние UI уже `recording`, повторный вызов физически недостижим через нормальный UI-путь | Нет действия (defensive guard) | Нет |
 | `notRecording` | `stopRecording()` без активной сессии | Не показывается напрямую — лог + сброс UI в `idle` | `stopRecordingFromMenu` catch-ветка сбрасывает UI | Нет |
 | `microphoneAccessDenied` | Microphone не `.authorized` при `startRecording()` | Модальный `NSAlert` «Microphone access denied» → System Settings | Пользователь выдаёт разрешение вручную | Нет (запись не начиналась) |
-| `invalidInputFormat` (initial start) | `sampleRate<=0` или `channelCount<=0` у входа при `startRecording()`, до создания WAV | Не показывается отдельно — лог | Пересборка движка при следующей попытке (`rebindEngineToCurrentInputDeviceIfNeeded`) | Нет — WAV ещё не создан на диске в этот момент, `removeItem` — no-op |
+| `invalidInputFormat` (initial start) | `sampleRate<=0` или `channelCount<=0` у входа при `startRecording()`, до создания WAV | Не показывается отдельно — лог | Следующий старт снова вызывает `rebuildEngine()` | Нет — WAV ещё не создан на диске в этот момент, `removeItem` — no-op |
 | `invalidInputFormat` (migration recovery) | То же условие в Фазе A `rebindActiveSessionToCurrentDevice()` при смене устройства | Не показывается пользователю напрямую | Ретрай (до 10 попыток, SR-AUD-009) | Нет — файл миграции не трогается, исходная сессия остаётся активной в слоте |
 | `converterUnavailable` (initial start) | `AVAudioConverter(from:to:)` вернул `nil` при `startRecording()`, до создания WAV | Не показывается отдельно — лог | Повторная попытка старта записи | Нет — WAV ещё не создан, `removeItem` — no-op |
 | `converterUnavailable` (migration recovery) | То же условие в Фазе A `rebindActiveSessionToCurrentDevice()` | Не показывается пользователю напрямую | Ретрай (до 10 попыток) | Нет — файл миграции не трогается |
@@ -861,15 +861,15 @@ WhisperHot обрабатывает потенциально чувствите�
 
 ### 11.1 Источник истины версии
 
-`Resources/Info.plist → CFBundleShortVersionString` — единственный источник истины отображаемой пользователю версии (SR-REL-001, `ARCHITECTURE.md:398-405`). На момент написания все источники синхронизированы на `0.10.0`:
+`Resources/Info.plist → CFBundleShortVersionString` — единственный источник истины отображаемой пользователю версии (SR-REL-001, `ARCHITECTURE.md:398-405`). На момент написания все источники синхронизированы на `0.10.1`:
 
 | Файл | Значение | Роль |
 |---|---|---|
-| `Resources/Info.plist` (`CFBundleShortVersionString`) | `0.10.0` | Источник истины (shipping) |
-| `Resources/Info.plist` (`CFBundleVersion`) | `25` | Build number |
-| `VERSION` | `0.10.0` | Tooling-дубль для скриптов сборки/лендинга |
-| `landing/lib/version.ts` (`BUILD_VERSION`) | `0.10.0` | Build-time fallback для лендинга; runtime `VersionSync` компонент подтягивает актуальную версию с GitHub Releases поверх этого fallback |
-| `CHANGELOG.md` (верхняя секция) | `## [0.10.0] — 2026-09-15` | Публичная история релиза |
+| `Resources/Info.plist` (`CFBundleShortVersionString`) | `0.10.1` | Источник истины (shipping) |
+| `Resources/Info.plist` (`CFBundleVersion`) | `26` | Build number |
+| `VERSION` | `0.10.1` | Tooling-дубль для скриптов сборки/лендинга |
+| `landing/lib/version.ts` (`BUILD_VERSION`) | `0.10.1` | Build-time fallback для лендинга; runtime `VersionSync` компонент подтягивает актуальную версию с GitHub Releases поверх этого fallback |
+| `CHANGELOG.md` (верхняя секция) | `## [0.10.1] — 2026-09-16` | Публичная история релиза |
 
 ### 11.2 `build.sh` — нормативная процедура
 

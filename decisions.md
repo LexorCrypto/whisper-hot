@@ -499,6 +499,14 @@ output. Поэтому `inputNode.auAudioUnit.deviceID` возвращает id 
 5. Auto-stop остаётся, но только как последнее средство — после исчерпания
    попыток либо сразу при `tapDrainTimedOut` — и выполняется через
    неблокирующий `resetAfterWake()`, а не `stopRecording()`.
+6. **Ревизия 2026-09-16.** Сверка только default input id недостаточна.
+   `CADefaultDeviceAggregate` включает и выход. Повтор экрана / AirPlay на
+   TV меняет default output, не трогая микрофон: idle-старт после зеркала
+   садился на отравленный движок (`engine.start()` / непригодный формат),
+   наблюдателя конфигурации в idle нет. Решение: свежий `AVAudioEngine` на
+   каждый `startRecording()` и на каждую миграцию (`rebuildEngine()`), без
+   skip-guard по input id.
+
 
 **Обоснование.** Пересоздание `AVAudioEngine` выбрано как перепривязка,
 которая не зависит от того, какой именно из вариантов залипания сработал:

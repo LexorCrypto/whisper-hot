@@ -1,5 +1,4 @@
 import AVFoundation
-import CoreAudio
 import Foundation
 import os
 
@@ -53,17 +52,12 @@ final class AudioRecorder: NSObject {
     /// The recording continues but the audio may be incomplete.
     var onRecordingError: ((String) -> Void)?
 
-    /// Rebuilt whenever the system's default input device moves out from under
-    /// it — see `rebindEngineToCurrentInputDeviceIfNeeded()`. A `var`, not a
-    /// `let`, for exactly that reason.
+    /// Rebuilt on every `startRecording()` and on every in-recording HAL
+    /// topology change. `AVAudioEngine` on macOS sits on a private
+    /// `CADefaultDeviceAggregate-*` that wraps **both** default input and
+    /// default output, so AirPlay / screen mirroring (output → TV) poisons
+    /// a live engine even when the microphone id is unchanged.
     private var engine = AVAudioEngine()
-
-    /// The default input device that was current when `engine` was built.
-    /// Main-thread only. `AVAudioEngine` cannot be asked which microphone it
-    /// is on — it runs on a private aggregate device — so this is how we
-    /// detect that the microphone changed under a live engine.
-    private var engineInputDeviceID = AudioRecorder.currentDefaultInputDeviceID()
-
     /// True while a device switch is in flight (notification seen, engine not
     /// yet re-bound). Coalesces the burst of configuration-change
     /// notifications a single Bluetooth connect produces.
@@ -130,7 +124,10 @@ final class AudioRecorder: NSObject {
         }
 
         invalidatePendingDeviceSwitch()
-        rebindEngineToCurrentInputDeviceIfNeeded()
+        // Fresh engine every take: screen mirroring / AirPlay rewires the
+        // HAL aggregate without changing the default input device id, and
+        // there is no configuration observer while idle.
+        rebuildEngine()
 
         let url = try Self.makeOutputURL()
         let inputNode = engine.inputNode
@@ -381,16 +378,17 @@ final class AudioRecorder: NSObject {
     /// `.AVAudioEngineConfigurationChange` fires whenever the HAL topology
     /// under the engine moves: AirPods connecting or disconnecting, a USB
     /// interface arriving, the user picking another input in System Settings,
-    /// or the current device renegotiating its sample rate.
+    /// the current device renegotiating its sample rate, **or AirPlay /
+    /// screen mirroring stealing the default output**.
     ///
     /// This used to tear the take down and report an auto-stop, which made
     /// AirPods unusable in two compounding ways: putting them on killed the
     /// recording, and the engine stayed bound to the input device that had
     /// just disappeared, so every subsequent `startRecording()` failed too —
-    /// the only way out was quitting and relaunching the app. Now we keep the
-    /// take alive: re-point the engine at the current default input and carry
-    /// on writing into the same WAV. Auto-stop is the last resort, once the
-    /// retries are exhausted.
+    /// the only way out was quitting and relaunching the app. The same class
+    /// of stall shows up when mirroring to a TV: output moves, the aggregate
+    /// dies, input id stays put. Now we keep the take alive when recording,
+    /// and we throw the engine away on the next start when idle.
     private func handleConfigurationChange() {
         dispatchPrecondition(condition: .onQueue(.main))
         // Also covers a notification landing while the user presses stop:
@@ -475,7 +473,7 @@ final class AudioRecorder: NSObject {
             throw AudioError.notRecording
         }
 
-        rebindEngineToCurrentInputDeviceIfNeeded()
+        rebuildEngine()
         let inputNode = engine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
         guard Self.isUsableFormat(inputFormat) else {
@@ -541,72 +539,31 @@ final class AudioRecorder: NSObject {
 
     // MARK: - Input device binding
 
-    /// Rebuilds `engine` when the system's default input device has moved
-    /// since the engine was built, or when the engine stopped reporting a
-    /// usable input format.
-    ///
-    /// Note what we do NOT do here: ask the engine which device it is on.
-    /// `AVAudioEngine` does not sit on a physical device at all — on macOS it
-    /// drives a private `CADefaultDeviceAggregate-*` that wraps the current
-    /// default input and output, so `inputNode.auAudioUnit.deviceID` returns
-    /// the aggregate's id, never the microphone's. Pinning the unit with
-    /// `setDeviceID(_:)` is not an option either: on an engine that has
-    /// already materialised its IO unit it fails with `-10851` and leaves the
-    /// unit with a device id of 0. So we remember the default input device we
-    /// built the engine for and compare against that.
-    ///
-    /// A fresh engine is the reliable recovery: after the HAL topology moves
-    /// under a live engine — AirPods connecting mid-session — its input node
-    /// can keep reporting the format of a device that is gone, and every
-    /// later `startRecording()` fails on `invalidInputFormat` until the app
-    /// is relaunched.
-    private func rebindEngineToCurrentInputDeviceIfNeeded() {
-        let systemDefault = Self.currentDefaultInputDeviceID()
-        let staleFormat = !Self.isUsableFormat(engine.inputNode.outputFormat(forBus: 0))
-        guard systemDefault != engineInputDeviceID || staleFormat else { return }
-        NSLog("WhisperHot: rebuilding audio engine (input device \(engineInputDeviceID) -> \(systemDefault), staleFormat=\(staleFormat))")
-        rebuildEngine()
-    }
-
     /// Tears the current engine down and replaces it with a fresh instance,
-    /// which resolves the default input device anew. Never waits on the tap or
-    /// writer queues, so it is also safe on the wake-recovery path.
+    /// which resolves the default input **and** output devices anew. Never
+    /// waits on the tap or writer queues, so it is also safe on the
+    /// wake-recovery path.
+    ///
+    /// We do not ask the engine which device it is on: `AVAudioEngine` on
+    /// macOS drives a private `CADefaultDeviceAggregate-*` wrapping both
+    /// default input and default output, so `inputNode.auAudioUnit.deviceID`
+    /// is the aggregate, never the microphone. `setDeviceID(_:)` on a
+    /// materialized unit fails with `-10851`. A fresh engine is the
+    /// recovery that also covers AirPlay / screen mirroring, which moves
+    /// output without changing the input device id.
     private func rebuildEngine() {
         removeConfigurationObserver()
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         engine = AVAudioEngine()
-        engineInputDeviceID = Self.currentDefaultInputDeviceID()
+        NSLog("WhisperHot: rebuilt audio engine")
     }
 
     private static func isUsableFormat(_ format: AVAudioFormat) -> Bool {
         format.sampleRate > 0 && format.channelCount > 0
     }
 
-    /// The HAL device id macOS currently routes audio input to, or
-    /// `kAudioObjectUnknown` when there is no input device at all.
-    private static func currentDefaultInputDeviceID() -> AudioDeviceID {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var deviceID = AudioDeviceID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            0,
-            nil,
-            &size,
-            &deviceID
-        )
-        guard status == noErr else {
-            NSLog("WhisperHot: could not read the default input device (OSStatus \(status))")
-            return AudioDeviceID(kAudioObjectUnknown)
-        }
-        return deviceID
-    }
+
 
     // MARK: - Helpers
 
